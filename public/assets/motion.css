@@ -1,0 +1,186 @@
+/* AVN Solar — motion layer v2 */
+@property --avn-n{syntax:'<integer>';inherits:false;initial-value:0}
+
+@keyframes avn-up{from{opacity:0;transform:translate3d(0,64px,0)}to{opacity:1;transform:none}}
+@keyframes avn-left{from{opacity:0;transform:translate3d(-72px,0,0)}to{opacity:1;transform:none}}
+@keyframes avn-right{from{opacity:0;transform:translate3d(72px,0,0)}to{opacity:1;transform:none}}
+@keyframes avn-zoom{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:none}}
+@keyframes avn-wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes avn-line{from{transform:translateY(110%)}to{transform:none}}
+@keyframes avn-fade{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@keyframes avn-marquee{from{transform:translate3d(0,0,0)}to{transform:translate3d(-50%,0,0)}}
+@keyframes avn-marquee-rev{from{transform:translate3d(-50%,0,0)}to{transform:translate3d(0,0,0)}}
+@keyframes avn-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes avn-bob{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-7px) rotate(-6deg)}}
+@keyframes avn-spin{to{transform:rotate(360deg)}}
+@keyframes avn-spin-rev{to{transform:rotate(-360deg)}}
+@keyframes avn-sway{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+@keyframes avn-ping{0%{box-shadow:0 0 0 0 rgba(30,142,90,.55)}100%{box-shadow:0 0 0 12px rgba(30,142,90,0)}}
+@keyframes avn-breathe{0%,100%{transform:scale(1);opacity:.85}50%{transform:scale(1.14);opacity:1}}
+@keyframes avn-draw{0%{stroke-dashoffset:360}55%,100%{stroke-dashoffset:0}}
+@keyframes avn-area{0%,25%{opacity:0}60%,100%{opacity:1}}
+@keyframes avn-glint{0%{transform:translateX(-150%) skewX(-20deg)}55%,100%{transform:translateX(460%) skewX(-20deg)}}
+@keyframes avn-cloud{from{transform:translateX(-160px)}to{transform:translateX(460px)}}
+@keyframes avn-cloud-wide{from{transform:translateX(-300px)}to{transform:translateX(1400px)}}
+@keyframes avn-toast{0%,6%{opacity:0;transform:translateY(16px) scale(.94)}12%,44%{opacity:1;transform:none}52%,100%{opacity:0;transform:translateY(-12px) scale(.98)}}
+@keyframes avn-grow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes avn-ring-out{to{transform:translateY(-70px) scale(.8);opacity:.25}}
+@keyframes avn-rise{0%{transform:translateY(0);opacity:0}15%{opacity:1}100%{transform:translateY(-240px);opacity:0}}
+@keyframes avn-dash{to{stroke-dashoffset:-20}}
+@keyframes avn-flowdash{to{stroke-dashoffset:-48}}
+@keyframes avn-scrub-l{from{transform:translateX(0)}to{transform:translateX(-38%)}}
+@keyframes avn-scrub-r{from{transform:translateX(-38%)}to{transform:translateX(0)}}
+@keyframes avn-circle{from{clip-path:circle(0% at 50% 55%)}to{clip-path:circle(120% at 50% 55%)}}
+@keyframes avn-par{from{transform:translateY(90px)}to{transform:translateY(-90px)}}
+@keyframes avn-par-rot{from{transform:rotate(-50deg)}to{transform:rotate(90deg)}}
+@keyframes avn-ringdraw{from{stroke-dashoffset:340}to{stroke-dashoffset:0}}
+@keyframes avn-n-78{from{--avn-n:0}to{--avn-n:78}}
+@keyframes avn-n-4{from{--avn-n:0}to{--avn-n:4}}
+@keyframes avn-n-25{from{--avn-n:0}to{--avn-n:25}}
+@keyframes avn-n-20{0%{--avn-n:0}85%,100%{--avn-n:20}}
+
+/* a day on the roof (scroll-scrubbed) */
+@keyframes avn-sky{0%{fill:#FFD6AE}12%{fill:#FFE6C7}30%,62%{fill:#CFE6FA}80%{fill:#F9B48F}91%{fill:#4A3F7A}100%{fill:#1B2459}}
+@keyframes avn-sunarm{from{transform:rotate(-80deg)}to{transform:rotate(80deg)}}
+@keyframes avn-suncol{0%{fill:#F26B1D}25%,65%{fill:#FFC12E}92%,100%{fill:#F26B1D}}
+@keyframes avn-pvglow{0%{fill:#1A2C6B}30%,62%{fill:#2BA6E4}85%,100%{fill:#1A2C6B}}
+@keyframes avn-flowop{0%,10%{opacity:0}25%,70%{opacity:1}85%,100%{opacity:0}}
+@keyframes avn-tint{0%,78%{opacity:0}100%{opacity:.55}}
+@keyframes avn-stars{0%,86%{opacity:0}100%{opacity:1}}
+@keyframes avn-win{0%,82%{fill:#C4D7F1}92%,100%{fill:#FFC12E}}
+@keyframes avn-cap1{0%,26%{opacity:1;transform:none}33%,100%{opacity:0;transform:translateY(-18px)}}
+@keyframes avn-cap2{0%,28%{opacity:0;transform:translateY(18px)}36%,62%{opacity:1;transform:none}70%,100%{opacity:0;transform:translateY(-18px)}}
+@keyframes avn-cap3{0%,66%{opacity:0;transform:translateY(18px)}75%,100%{opacity:1;transform:none}}
+@keyframes avn-daydot{from{left:0%}to{left:100%}}
+
+/* load-in (hero) */
+.avn-line{display:block;overflow:clip;padding-bottom:.08em}
+.avn-line>span{display:inline-block;animation:avn-line 1.1s cubic-bezier(.2,.75,.15,1) both}
+.avn-l2>span{animation-delay:.14s}
+.avn-l3>span{animation-delay:.28s}
+.avn-in{animation:avn-up 1s cubic-bezier(.2,.75,.15,1) both .3s}
+.avn-in-1{animation-delay:.45s}
+.avn-in-2{animation-delay:.6s}
+.avn-pop{animation:avn-zoom 1.2s cubic-bezier(.2,.75,.15,1) both .15s}
+
+/* always-on */
+.avn-float{animation:avn-float 6s ease-in-out infinite}
+.avn-float-2{animation:avn-float 7s ease-in-out infinite 1.4s}
+.avn-bob{animation:avn-bob 4.6s ease-in-out infinite}
+.avn-bob-2{animation-delay:.7s}
+.avn-bob-3{animation-delay:1.4s}
+.avn-bob-4{animation-delay:2.1s}
+.avn-spin{animation:avn-spin 12s linear infinite}
+.avn-spin-slow{animation:avn-spin 70s linear infinite}
+.avn-ping{animation:avn-ping 1.6s ease-out infinite}
+.avn-breathe{animation:avn-breathe 3.4s ease-in-out infinite}
+.avn-svg-c{transform-box:fill-box;transform-origin:center}
+.avn-rays{transform-box:view-box;transform-origin:260px 260px;animation:avn-sway 8s ease-in-out infinite}
+.avn-orbit{transform-box:view-box;transform-origin:260px 260px;animation:avn-spin 90s linear infinite}
+.avn-orbit-rev{transform-box:view-box;transform-origin:260px 260px;animation:avn-spin-rev 50s linear infinite}
+.avn-marquee{display:flex;width:max-content;animation:avn-marquee 34s linear infinite}
+.avn-marquee-rev{display:flex;width:max-content;animation:avn-marquee-rev 40s linear infinite}
+.avn-ribbon:hover .avn-marquee,.avn-ribbon:hover .avn-marquee-rev{animation-play-state:paused}
+.avn-chart-line{stroke-dasharray:360;stroke-dashoffset:360;animation:avn-draw 6s ease-in-out infinite}
+.avn-chart-area{animation:avn-area 6s ease-in-out infinite}
+.avn-glint{position:absolute;inset:0;overflow:clip;pointer-events:none}
+.avn-glint::after{content:"";position:absolute;top:0;bottom:0;left:0;width:26%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.55),rgba(255,255,255,0));animation:avn-glint 5s ease-in-out infinite}
+.avn-glint-2::after{animation-delay:1.6s}
+.avn-glint-3::after{animation-delay:3.2s}
+.avn-shine{position:relative;overflow:clip}
+.avn-shine::after{content:"";position:absolute;top:0;bottom:0;left:0;width:34%;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.4),rgba(255,255,255,0));animation:avn-glint 3.8s ease-in-out infinite;pointer-events:none}
+.avn-cloud{animation:avn-cloud 26s linear infinite}
+.avn-cloud-2{animation-duration:34s;animation-delay:-14s}
+.avn-cloud-wide{animation:avn-cloud-wide 60s linear infinite}
+.avn-cloud-wide-2{animation-duration:80s;animation-delay:-35s}
+.avn-toast{animation:avn-toast 8s ease-in-out infinite both}
+.avn-toast-2{animation-delay:4s}
+.avn-spark{animation:avn-rise 7s linear infinite}
+.avn-spark-2{animation-duration:8.5s;animation-delay:-2.4s}
+.avn-spark-3{animation-duration:6.2s;animation-delay:-4.1s}
+.avn-spark-4{animation-duration:9s;animation-delay:-5.6s}
+.avn-ans{animation:avn-fade .45s ease both}
+.avn-dash-flow{animation:avn-dash 1.4s linear infinite}
+
+/* hover */
+.avn-lift{transition:transform .35s cubic-bezier(.2,.75,.15,1),box-shadow .35s ease}
+.avn-lift:hover{transform:translateY(-10px);box-shadow:0 28px 56px rgba(17,24,71,.14)}
+.avn-btn{transition:transform .2s ease,box-shadow .2s ease}
+.avn-btn:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(17,24,71,.22)}
+.avn-ul{background-image:linear-gradient(#F7931E,#F7931E);background-size:0 2px;background-position:0 85%;background-repeat:no-repeat;transition:background-size .3s ease}
+.avn-ul:hover{background-size:100% 2px}
+
+/* counters */
+.avn-num{counter-reset:avn-c var(--avn-n)}
+.avn-num::after{content:counter(avn-c)}
+.avn-n-78{--avn-n:78}
+.avn-n-4{--avn-n:4}
+.avn-n-25{--avn-n:25}
+.avn-n-20{--avn-n:20}
+.avn-ringdraw{stroke-dasharray:340;stroke-dashoffset:0}
+
+/* day scene base = midday */
+.avn-day{view-timeline-name:--avn-day;view-timeline-axis:block}
+.avn-sky{fill:#CFE6FA}
+.avn-sunarm{transform-box:view-box;transform-origin:600px 640px}
+.avn-sunbody{fill:#FFC12E}
+.avn-pv{fill:#2BA6E4}
+.avn-flow{stroke-dasharray:8 16;opacity:1;animation:avn-flowdash 1.1s linear infinite}
+.avn-tint{opacity:0}
+.avn-stars{opacity:0}
+.avn-win{fill:#C4D7F1}
+.avn-cap1{opacity:0}
+.avn-cap2{opacity:1}
+.avn-cap3{opacity:0}
+.avn-daybar{transform-origin:0 50%}
+.avn-daydot{left:50%}
+
+/* scroll-driven */
+.avn-progress{transform-origin:0 50%;transform:scaleX(0)}
+@supports (animation-timeline: view()){
+.avn-rv{animation:avn-up linear both;animation-timeline:view();animation-range:entry 0% cover 30%}
+.avn-rv-l{animation:avn-left linear both;animation-timeline:view();animation-range:entry 0% cover 32%}
+.avn-rv-r{animation:avn-right linear both;animation-timeline:view();animation-range:entry 0% cover 32%}
+.avn-rv-z{animation:avn-zoom linear both;animation-timeline:view();animation-range:entry 10% cover 35%}
+.avn-rv-wipe{animation:avn-wipe linear both;animation-timeline:view();animation-range:entry 20% cover 42%}
+.avn-rv-circle{animation:avn-circle linear both;animation-timeline:view();animation-range:entry 5% cover 45%}
+.avn-st-1{animation-range:entry 6% cover 34%}
+.avn-st-2{animation-range:entry 14% cover 38%}
+.avn-st-3{animation-range:entry 22% cover 42%}
+.avn-st-4{animation-range:entry 30% cover 46%}
+.avn-st-5{animation-range:entry 38% cover 50%}
+.avn-st-6{animation-range:entry 46% cover 54%}
+.avn-grow-rv{transform-origin:0 50%;animation:avn-grow linear both;animation-timeline:view();animation-range:entry 30% cover 50%}
+.avn-progress{animation:avn-grow linear both;animation-timeline:scroll(nearest block)}
+.avn-ring-out{animation:avn-ring-out linear both;animation-timeline:scroll(nearest block);animation-range:0px 900px}
+.avn-scrub-l{animation:avn-scrub-l linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
+.avn-scrub-r{animation:avn-scrub-r linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
+.avn-par{animation:avn-par linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
+.avn-par-rot{animation:avn-par-rot linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
+.avn-ringdraw{animation:avn-ringdraw linear both;animation-timeline:view();animation-range:entry 20% cover 50%}
+.avn-n-78{animation:avn-n-78 linear both;animation-timeline:view();animation-range:entry 20% cover 50%}
+.avn-n-4{animation:avn-n-4 linear both;animation-timeline:view();animation-range:entry 20% cover 50%}
+.avn-n-25{animation:avn-n-25 linear both;animation-timeline:view();animation-range:entry 20% cover 50%}
+.avn-day .avn-n-20{animation:avn-n-20 linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-sky{animation:avn-sky linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-sunarm{animation:avn-sunarm linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-sunbody{animation:avn-suncol linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-pv{animation:avn-pvglow linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-flow{animation:avn-flowdash 1.1s linear infinite,avn-flowop linear both;animation-timeline:auto,--avn-day;animation-range:normal,contain 0% contain 100%}
+.avn-day .avn-tint{animation:avn-tint linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-stars{animation:avn-stars linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-win{animation:avn-win linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-cap1{animation:avn-cap1 linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-cap2{animation:avn-cap2 linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-cap3{animation:avn-cap3 linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-daybar{animation:avn-grow linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+.avn-day .avn-daydot{animation:avn-daydot linear both;animation-timeline:--avn-day;animation-range:contain 0% contain 100%}
+}
+
+/* motion off */
+.avn-still *,.avn-still *::after{animation:none!important}
+.avn-still .avn-chart-line{stroke-dashoffset:0}
+@media (prefers-reduced-motion:reduce){
+.avn *,.avn *::after{animation:none!important;transition:none!important}
+.avn .avn-chart-line{stroke-dashoffset:0}
+}

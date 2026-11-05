@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CRM — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/crm.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="crm" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">CRM</h1><div class="sub">Every enquiry, from first call to signed order.</div></div>
+    <div class="row">
+      <label class="search"><span class="sr-only">Search leads</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5B6285" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20 L16 16"/></svg>
+        <input type="search" placeholder="Search name, phone or place" x-model="q">
+      </label>
+      <button class="btn primary" type="button" @click="openNew()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>New lead</button>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><span>Open leads</span><b x-text="kpi.open"></b></div>
+    <div class="kpi"><span>Pipeline value</span><b x-text="AVN.money(kpi.pipe)"></b></div>
+    <div class="kpi"><span>Follow-ups due today or late</span><b x-text="kpi.due"></b></div>
+    <div class="kpi dark"><span>Won this month</span><b x-text="AVN.money(kpi.won)"></b></div>
+  </div>
+
+  <div class="row between">
+    <div class="chips" role="group" aria-label="Filter by type">
+      <template x-for="t in types" :key="t">
+        <button type="button" class="chip" :class="type === t && 'on'" :aria-pressed="type === t" @click="type = t" x-text="t"></button>
+      </template>
+    </div>
+    <button type="button" class="chip" :class="showLost && 'on'" :aria-pressed="showLost" @click="showLost = !showLost" x-text="'Lost (' + lostCount + ')'"></button>
+  </div>
+
+  <div class="kanban" :style="showLost ? 'grid-template-columns:repeat(6,minmax(220px,1fr))' : ''">
+    <template x-for="col in columns" :key="col.stage">
+      <section class="col" :aria-label="col.name">
+        <div>
+          <div class="col-head"><span class="row" style="gap:8px"><span class="dot" :style="'background:' + col.color"></span><span x-text="col.name"></span></span><span class="badge" style="background:#fff" x-text="col.items.length"></span></div>
+          <div class="small muted" style="padding:0 4px" x-text="col.items.length ? AVN.money(col.total) + ' total' : '—'"></div>
+        </div>
+        <template x-for="l in col.items" :key="l.id">
+          <button type="button" class="lead" :class="sel && sel.id === l.id && 'on'" @click="open(l)">
+            <b x-text="l.name"></b>
+            <span class="small muted" x-text="[l.place, l.size].filter(Boolean).join(' · ') || l.type"></span>
+            <span class="row between" style="gap:6px">
+              <b x-text="AVN.money(l.value)"></b>
+              <span class="badge" :class="dueClass(l)" x-text="dueLabel(l)" x-show="l.dueDate || l.stage === 4"></span>
+            </span>
+            <span class="row between small muted" style="border-top:1px solid #EEF2F9;padding-top:6px;gap:6px">
+              <span x-text="l.source"></span><span x-text="l.ownerName"></span>
+            </span>
+          </button>
+        </template>
+        <div class="empty small" x-show="!col.items.length">No leads</div>
+      </section>
+    </template>
+  </div>
+
+  <!-- Lead drawer -->
+  <div class="overlay" x-show="sel" x-transition.opacity @click.self="close()" @keydown.escape.window="close()">
+    <aside class="drawer" aria-label="Lead details" x-show="sel" x-transition>
+      <template x-if="sel">
+        <div class="stack" style="gap:16px">
+          <div class="row between" style="align-items:flex-start;flex-wrap:nowrap">
+            <div><div class="eyebrow" x-text="sel.type + ' lead · ' + sel.source"></div><h2 class="h2" x-text="sel.name"></h2></div>
+            <button type="button" class="btn icon" @click="close()" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18"/></svg></button>
+          </div>
+          <div class="steps" style="--n:5">
+            <template x-for="(s, i) in stages.slice(0, 5)" :key="i">
+              <div :class="i < sel.stage && sel.stage !== 5 ? 'done' : (i === sel.stage ? 'now' : '')"><i></i><button type="button" class="link small" style="text-align:left;font-weight:inherit;color:inherit" @click="setStage(i)" x-text="s"></button></div>
+            </template>
+          </div>
+          <div class="row">
+            <a class="btn sm" :href="'tel:+91' + sel.phone" x-show="sel.phone">Call</a>
+            <a class="btn sm" :href="'https://wa.me/91' + sel.phone" target="_blank" rel="noopener" x-show="sel.phone">WhatsApp</a>
+            <button class="btn sm" type="button" x-show="sel.stage < 4" @click="setStage(sel.stage + 1)" x-text="'Move to ' + stages[sel.stage + 1]"></button>
+            <button class="btn sm primary" type="button" x-show="sel.stage === 4 && !sel.projectId && $store.app.perms.projects" @click="convert()">Create project</button>
+            <a class="btn sm" x-show="sel.projectId" href="/admin/projects">Open project</a>
+          </div>
+          <form class="stack" @submit.prevent="save()">
+            <div class="grid" style="--min:170px">
+              <label class="field">Name<input class="input" x-model="sel.name" required></label>
+              <label class="field">Mobile<input class="input" x-model="sel.phone" inputmode="tel"></label>
+              <label class="field">Place<input class="input" x-model="sel.place"></label>
+              <label class="field">Type<select class="select" x-model="sel.type"><template x-for="t in types.slice(1)" :key="t"><option :value="t" x-text="t"></option></template></select></label>
+              <label class="field">System size<input class="input" x-model="sel.size" placeholder="5 kWp"></label>
+              <label class="field">Value (₹ lakh)<input class="input" type="number" step="0.1" min="0" x-model="sel.value"></label>
+              <label class="field">Owner<select class="select" x-model.number="sel.ownerId"><option value="">—</option><template x-for="m in team" :key="m.id"><option :value="m.id" x-text="m.name"></option></template></select></label>
+              <label class="field">Source<select class="select" x-model="sel.source"><template x-for="s in sources" :key="s"><option :value="s" x-text="s"></option></template></select></label>
+              <label class="field">Next action<input class="input" x-model="sel.nextAction" placeholder="Call back"></label>
+              <label class="field">Due date<input class="input" type="date" x-model="sel.dueDate"></label>
+            </div>
+            <label class="field">Notes<textarea class="textarea" x-model="sel.message"></textarea></label>
+            <div class="row between">
+              <div class="row">
+                <button class="btn dark" type="submit">Save</button>
+                <button class="btn" type="button" x-show="sel.stage !== 5" @click="setStage(5)">Mark lost</button>
+                <button class="btn" type="button" x-show="sel.stage === 5" @click="setStage(0)">Reopen</button>
+              </div>
+              <button class="btn danger" type="button" @click="remove()">Delete</button>
+            </div>
+          </form>
+          <div class="stack">
+            <div class="eyebrow" style="color:var(--muted)">Activity</div>
+            <form class="row" style="flex-wrap:nowrap" @submit.prevent="addNote()">
+              <label class="sr-only" for="note">Add a note</label>
+              <input id="note" class="input" x-model="note" placeholder="Called, wants subsidy details…">
+              <button class="btn" type="submit">Add</button>
+            </form>
+            <template x-for="a in activity" :key="a.id">
+              <div class="row" style="align-items:flex-start;flex-wrap:nowrap;gap:10px">
+                <span class="dot" style="margin-top:7px;background:var(--orange);width:8px;height:8px"></span>
+                <span><span x-text="a.text"></span><br><span class="small muted" x-text="(a.userName || 'Website') + ' · ' + AVN.when(a.createdAt)"></span></span>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </aside>
+  </div>
+
+  <!-- New lead -->
+  <div class="overlay center" x-show="creating" x-transition.opacity @click.self="creating = false">
+    <form class="modal" @submit.prevent="create()">
+      <h2 class="h2">New lead</h2>
+      <div class="error" x-show="error" x-text="error"></div>
+      <div class="grid" style="--min:180px">
+        <label class="field">Name<input class="input" x-model="form.name" required></label>
+        <label class="field">Mobile<input class="input" x-model="form.phone" inputmode="tel"></label>
+        <label class="field">Place<input class="input" x-model="form.place"></label>
+        <label class="field">Type<select class="select" x-model="form.type"><template x-for="t in types.slice(1)" :key="t"><option :value="t" x-text="t"></option></template></select></label>
+        <label class="field">System size<input class="input" x-model="form.size" placeholder="5 kWp"></label>
+        <label class="field">Value (₹ lakh)<input class="input" type="number" step="0.1" min="0" x-model="form.value"></label>
+        <label class="field">Source<select class="select" x-model="form.source"><template x-for="s in sources" :key="s"><option :value="s" x-text="s"></option></template></select></label>
+        <label class="field">Follow up on<input class="input" type="date" x-model="form.dueDate"></label>
+      </div>
+      <div class="row"><button class="btn dark" type="submit">Add lead</button><button class="btn" type="button" @click="creating = false">Cancel</button></div>
+    </form>
+  </div>
+</main>
+</div>
+</body>
+</html>

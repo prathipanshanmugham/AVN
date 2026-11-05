@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Settings — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/settings.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="settings" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">Settings</h1><div class="sub" x-text="isAdmin ? 'Users, permissions and everything the website runs on.' : 'Your account. Only admins can change workspace settings.'"></div></div>
+  </div>
+
+  <div class="split">
+    <nav class="list card stack" style="flex:1 1 220px;padding:10px;gap:4px" aria-label="Settings sections">
+      <template x-for="s in visibleSections" :key="s.id">
+        <button type="button" class="btn navbtn" :class="sec === s.id && 'on'" :aria-pressed="sec === s.id" @click="sec = s.id" x-text="s.name"></button>
+      </template>
+    </nav>
+
+    <section class="detail card stack" aria-label="Settings panel">
+      <!-- Users -->
+      <template x-if="sec === 'users'">
+        <div class="stack">
+          <div class="row between"><div><h2 class="h2">Users</h2><div class="muted">Two roles: <b>Admin</b> can do everything. <b>Staff</b> can open what Permissions allow.</div></div>
+            <button class="btn primary" type="button" @click="openUser()">Add user</button></div>
+          <div class="rows">
+            <template x-for="u in users" :key="u.id">
+              <div class="rowline" style="padding:10px 0">
+                <div><b x-text="u.name"></b> <span class="badge" :class="u.role === 'admin' ? 'dark' : ''" x-text="u.role === 'admin' ? 'Admin' : 'Staff'"></span>
+                  <span class="badge red" x-show="!u.active">Disabled</span><span class="badge amber" x-show="u.active && u.mustChange">Temporary password</span>
+                  <div class="small muted" x-text="'@' + u.username + (u.email ? ' · ' + u.email : '') + ' · ' + (u.lastLogin ? 'last sign-in ' + AVN.when(u.lastLogin) : 'never signed in')"></div></div>
+                <div class="row"><button class="btn sm" type="button" @click="openUser(u)">Edit</button><button class="btn sm" type="button" @click="resetUser(u)">Reset password</button></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <!-- Permissions -->
+      <template x-if="sec === 'permissions'">
+        <div class="stack">
+          <div><h2 class="h2">Permissions</h2><div class="muted">Choose what the Staff role can open. Admins always have full access. Settings, users and permissions are admin-only.</div></div>
+          <div class="rows">
+            <div class="rowline small muted" style="font-weight:700"><span>Section</span><span class="row" style="gap:28px"><span>Admin</span><span>Staff</span></span></div>
+            <template x-for="m in modules" :key="m.id">
+              <div class="rowline">
+                <span><b x-text="m.name"></b><br><span class="small muted" x-text="m.desc"></span></span>
+                <span class="row" style="gap:28px;flex-wrap:nowrap"><span class="badge green" title="Always on">✓</span>
+                  <button type="button" class="switch" role="switch" :aria-checked="(!!perms[m.id]).toString()" :aria-label="'Staff can open ' + m.name" @click="togglePerm(m.id)"></button></span>
+              </div>
+            </template>
+            <div class="rowline"><span><b>Settings, users &amp; permissions</b><br><span class="small muted">Company details, website settings, user accounts</span></span><span class="row" style="gap:28px"><span class="badge green">✓</span><span class="badge">Admin only</span></span></div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Company / Website forms -->
+      <template x-if="sec === 'company' || sec === 'site'">
+        <form class="stack" @submit.prevent="saveSettings()">
+          <div><h2 class="h2" x-text="sec === 'company' ? 'Company & contact' : 'Website & calculator'"></h2>
+            <div class="muted" x-text="sec === 'company' ? 'Shown on the website footer, contact buttons and the client portal.' : 'Search engine text, analytics, video loading and the savings calculator.'"></div></div>
+          <div class="grid" style="--min:240px">
+            <template x-for="f in fieldsFor(sec)" :key="f.k">
+              <label class="field" :style="f.wide ? 'grid-column:1/-1' : ''"><span x-text="f.label"></span> <small x-text="f.hint"></small>
+                <template x-if="f.area"><textarea class="textarea" x-model="cfg[f.k]"></textarea></template>
+                <template x-if="!f.area"><input class="input" :type="f.type || 'text'" :step="f.type === 'number' ? 'any' : null" x-model="cfg[f.k]" :placeholder="f.ph || ''"></template>
+              </label>
+            </template>
+          </div>
+          <div class="rowline" x-show="sec === 'site'"><span><b>Play hero video only on fast connections</b><br><span class="small muted">Visitors on data-saver or 2G see the still image instead</span></span>
+            <button type="button" class="switch" role="switch" :aria-checked="(cfg.video_fast_only === '1').toString()" aria-label="Play hero video only on fast connections" @click="cfg.video_fast_only = cfg.video_fast_only === '1' ? '0' : '1'"></button></div>
+          <div><button class="btn dark" type="submit">Save changes</button></div>
+        </form>
+      </template>
+
+      <!-- Account -->
+      <template x-if="sec === 'account'">
+        <div class="stack">
+          <h2 class="h2">My account</h2>
+          <div class="muted" x-text="$store.app.user.name + ' · @' + $store.app.user.username"></div>
+          <div><a class="btn dark" href="/admin/account">Change my password</a></div>
+        </div>
+      </template>
+    </section>
+  </div>
+
+  <!-- User modal -->
+  <div class="overlay center" x-show="modal" x-transition.opacity @click.self="modal = null">
+    <form class="modal" x-show="modal === 'user'" @submit.prevent="saveUser()">
+      <h2 class="h2" x-text="uform.id ? 'Edit user' : 'Add user'"></h2>
+      <div class="error" x-show="error" x-text="error"></div>
+      <div class="grid" style="--min:200px">
+        <label class="field">Full name<input class="input" x-model="uform.name" required></label>
+        <label class="field">Username <small>for signing in</small><input class="input" x-model="uform.username" :disabled="!!uform.id" required pattern="[A-Za-z0-9._\-]{3,40}"></label>
+        <label class="field">Email <small>optional</small><input class="input" type="email" x-model="uform.email"></label>
+        <label class="field">Role<select class="select" x-model="uform.role"><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
+        <label class="field" x-show="!uform.id">Password <small>blank = generate one</small><input class="input" x-model="uform.password" minlength="10" autocomplete="new-password"></label>
+        <label class="field" x-show="uform.id">Status<select class="select" x-model="uform.active"><option value="1">Active</option><option value="0">Disabled</option></select></label>
+      </div>
+      <div class="row"><button class="btn dark" type="submit">Save</button><button class="btn" type="button" @click="modal = null">Cancel</button></div>
+    </form>
+    <div class="modal" x-show="modal === 'secret'">
+      <h2 class="h2">Temporary password</h2>
+      <p class="muted" style="margin:0">Give this to <b x-text="secret.name"></b> (username <b x-text="secret.username"></b>). It is shown only now, and they will set their own password after signing in at <b x-text="location.origin + '/admin'"></b>.</p>
+      <div class="secret"><span x-text="secret.password"></span><button class="btn sm" type="button" @click="AVN.copy(secret.password)">Copy</button></div>
+      <div><button class="btn" type="button" @click="modal = null">Done</button></div>
+    </div>
+  </div>
+</main>
+</div>
+</body>
+</html>

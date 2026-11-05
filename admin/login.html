@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Staff sign-in — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/login.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="auth">
+  <form class="modal" x-data="login" @submit.prevent="submit" x-cloak>
+    <div class="row">
+      <img src="/assets/logo.png" alt="AVN Solar logo" width="52" height="52" style="object-fit:contain">
+      <div><b style="font-family:var(--display);font-size:18px">AVN Workspace</b><div class="small muted">CRM · Projects · Calendar · Clients · Website</div></div>
+    </div>
+    <div>
+      <h1 class="title" style="font-size:24px">Staff sign-in</h1>
+      <p class="muted" style="margin:4px 0 0">For AVN team members only.</p>
+    </div>
+    <div class="error" x-show="error" x-text="error" role="alert"></div>
+    <label class="field">Username or email
+      <input class="input" x-model="username" autocomplete="username" required autofocus>
+    </label>
+    <label class="field">Password
+      <span class="row" style="flex-wrap:nowrap;gap:0">
+        <input class="input" :type="show ? 'text' : 'password'" x-model="password" autocomplete="current-password" required style="border-radius:12px 0 0 12px">
+        <button type="button" class="btn" style="border-radius:0 12px 12px 0;border-left:0" @click="show = !show" :aria-label="show ? 'Hide password' : 'Show password'" x-text="show ? 'Hide' : 'Show'"></button>
+      </span>
+    </label>
+    <button class="btn dark" type="submit" :disabled="busy" style="min-height:52px;font-size:16px" x-text="busy ? 'Signing in…' : 'Sign in'"></button>
+    <p class="small muted" style="margin:0;text-align:center">Forgot your password? Ask an admin to reset it from Settings → Users.</p>
+  </form>
+  <a href="/" style="color:#C9D0EC;font-weight:700;text-decoration:none">← Back to website</a>
+</div>
+</body>
+</html>

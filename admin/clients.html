@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Clients — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/clients.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="clients" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">Clients</h1><div class="sub">Customer portal logins and service requests.</div></div>
+    <button class="btn primary" type="button" @click="openNew()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>New client login</button>
+  </div>
+
+  <div class="row between">
+    <div class="tabs" style="min-width:300px" role="group" aria-label="View">
+      <button type="button" :class="tab === 'logins' && 'on'" :aria-pressed="tab === 'logins'" @click="tab = 'logins'" x-text="'Logins (' + list.length + ')'"></button>
+      <button type="button" :class="tab === 'requests' && 'on'" :aria-pressed="tab === 'requests'" @click="tab = 'requests'" x-text="'Requests (' + openRequests + ' open)'"></button>
+    </div>
+    <label class="search" x-show="tab === 'logins'"><span class="sr-only">Search clients</span><input type="search" placeholder="Search name, ID or mobile" x-model="q"></label>
+  </div>
+
+  <section class="card" style="padding:6px 18px" x-show="tab === 'logins'" aria-label="Client logins">
+    <div class="rows">
+      <template x-for="c in filtered" :key="c.id">
+        <div class="rowline" style="padding:12px 0;align-items:flex-start">
+          <div style="min-width:0">
+            <b x-text="c.name"></b> <span class="badge" x-text="c.customerId"></span>
+            <span class="badge red" x-show="!c.active">Disabled</span>
+            <span class="badge amber" x-show="c.active && c.mustChange">Hasn't set own password</span>
+            <div class="small muted" x-text="'+91 ' + c.phone + (c.email ? ' · ' + c.email : '') + ' · ' + (c.projects.length ? c.projects.map(p => p.name).join(', ') : 'No project linked')"></div>
+            <div class="small muted" x-text="c.lastLogin ? 'Last sign-in ' + AVN.when(c.lastLogin) : 'Never signed in'"></div>
+          </div>
+          <div class="row" style="flex:none">
+            <button class="btn sm" type="button" @click="openEdit(c)">Edit</button>
+            <button class="btn sm" type="button" @click="reset(c)">Reset password</button>
+            <button class="btn sm" :class="c.active && 'danger'" type="button" @click="toggleActive(c)" x-text="c.active ? 'Disable' : 'Enable'"></button>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div class="empty" style="margin:12px 0" x-show="!filtered.length">No client logins yet. Create one when a project starts so the customer can track it.</div>
+  </section>
+
+  <section class="card" style="padding:6px 18px" x-show="tab === 'requests'" aria-label="Service requests">
+    <div class="rows">
+      <template x-for="r in requests" :key="r.id">
+        <div class="rowline" style="padding:12px 0;align-items:flex-start">
+          <div><b x-text="r.clientName"></b> <span class="badge" x-text="r.customerId"></span><div x-text="r.message" style="margin:4px 0"></div><div class="small muted" x-text="(r.projectName || 'No project') + ' · ' + AVN.when(r.createdAt) + ' · +91 ' + r.phone"></div></div>
+          <label class="sr-only" :for="'st' + r.id">Status</label>
+          <select :id="'st' + r.id" class="select" style="width:auto" :value="r.status" @change="setStatus(r, $event.target.value)">
+            <option value="open">Open</option><option value="in_progress">In progress</option><option value="closed">Closed</option>
+          </select>
+        </div>
+      </template>
+    </div>
+    <div class="empty" style="margin:12px 0" x-show="!requests.length">No service requests from clients yet.</div>
+  </section>
+
+  <!-- Create / edit -->
+  <div class="overlay center" x-show="modal" x-transition.opacity @click.self="modal = null">
+    <form class="modal" @submit.prevent="submit()" x-show="modal === 'form'">
+      <h2 class="h2" x-text="form.id ? 'Edit client' : 'New client login'"></h2>
+      <p class="muted" style="margin:0" x-show="!form.id">The client signs in at <b x-text="portalUrl"></b> with their Customer ID or mobile number. They choose their own password on first sign-in.</p>
+      <div class="error" x-show="error" x-text="error"></div>
+      <div class="grid" style="--min:200px">
+        <label class="field">Client name<input class="input" x-model="form.name" required></label>
+        <label class="field">Mobile number<input class="input" x-model="form.phone" inputmode="tel" placeholder="98765 43210" required></label>
+        <label class="field">Email <small>optional</small><input class="input" type="email" x-model="form.email"></label>
+        <label class="field" x-show="projects.length">Link to project<select class="select" x-model="form.projectId"><option value="">—</option><template x-for="p in projects" :key="p.id"><option :value="p.id" x-text="p.name"></option></template></select></label>
+        <label class="field" x-show="!form.id">Password <small>leave blank to generate one</small><input class="input" x-model="form.password" autocomplete="new-password" minlength="8"></label>
+      </div>
+      <div class="row"><button class="btn dark" type="submit" x-text="form.id ? 'Save' : 'Create login'"></button><button class="btn" type="button" @click="modal = null">Cancel</button></div>
+    </form>
+
+    <div class="modal" x-show="modal === 'creds'">
+      <h2 class="h2">Login details</h2>
+      <p class="muted" style="margin:0">Share these with <b x-text="creds.name"></b>. The password is shown only now.</p>
+      <div class="stack" style="gap:8px">
+        <div class="rowline"><span class="muted">Portal</span><b x-text="portalUrl"></b></div>
+        <div class="rowline"><span class="muted">Customer ID</span><b x-text="creds.customerId"></b></div>
+        <div class="rowline"><span class="muted">or mobile</span><b x-text="creds.phone"></b></div>
+        <div class="secret"><span x-text="creds.password"></span><button class="btn sm" type="button" @click="AVN.copy(creds.password)">Copy</button></div>
+      </div>
+      <div class="row">
+        <button class="btn primary" type="button" @click="AVN.copy(message)">Copy WhatsApp message</button>
+        <a class="btn" :href="'https://wa.me/91' + creds.phone + '?text=' + encodeURIComponent(message)" target="_blank" rel="noopener">Open WhatsApp</a>
+        <button class="btn" type="button" @click="modal = null">Done</button>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+</body>
+</html>

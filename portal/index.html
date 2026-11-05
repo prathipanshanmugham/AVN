@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>My solar — AVN Solar</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/portal/assets/portal.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div x-data="portal" x-cloak>
+  <header style="background:#fff;border-bottom:1px solid var(--line)">
+    <div class="row between" style="max-width:1000px;margin:0 auto;padding:12px 20px">
+      <a href="/" class="row" style="text-decoration:none;color:var(--ink)"><img src="/assets/logo.png" alt="AVN Solar logo" width="44" height="44" style="object-fit:contain"><b style="font-family:var(--display)">AVN Solar</b></a>
+      <div class="row"><span class="small muted" x-text="me ? me.client.name + ' · ' + me.client.customerId : ''"></span><button class="btn sm" type="button" @click="logout()">Sign out</button></div>
+    </div>
+  </header>
+
+  <main style="max-width:1000px;margin:0 auto;padding:24px 20px 60px" class="stack">
+    <template x-if="me && me.client.mustChange">
+      <section class="card stack" style="max-width:520px">
+        <h1 class="title" style="font-size:22px">Set your password</h1>
+        <p class="muted" style="margin:0">You signed in with a temporary password. Choose your own to continue.</p>
+        <div class="error" x-show="error" x-text="error"></div>
+        <form class="stack" @submit.prevent="changePassword()">
+          <label class="field">Temporary password<input class="input" type="password" x-model="pw.current" autocomplete="current-password" required></label>
+          <label class="field">New password <small>at least 8 characters</small><input class="input" type="password" x-model="pw.next" minlength="8" autocomplete="new-password" required></label>
+          <label class="field">Repeat new password<input class="input" type="password" x-model="pw.repeat" autocomplete="new-password" required></label>
+          <button class="btn dark" type="submit">Save password</button>
+        </form>
+      </section>
+    </template>
+
+    <template x-if="me && !me.client.mustChange">
+      <div class="stack" style="gap:20px">
+        <div><h1 class="title" x-text="'Hello, ' + me.client.name.split(' ')[0]"></h1><div class="sub">Here’s where your solar project stands.</div></div>
+
+        <template x-for="p in me.projects" :key="p.id">
+          <section class="card stack" :aria-label="p.name">
+            <div class="row between" style="align-items:flex-start">
+              <div><div class="eyebrow" x-text="p.type || 'Solar project'"></div><h2 class="h2" x-text="p.name"></h2><div class="muted" x-text="[p.place, p.kwp].filter(Boolean).join(' · ')"></div></div>
+              <span class="badge" :class="p.stage >= 6 ? 'green' : 'amber'" style="font-size:14px" x-text="p.stage >= 6 ? 'Handed over' : 'Stage ' + (p.stage + 1) + ' of 6 · ' + p.stageName"></span>
+            </div>
+            <div class="steps" style="--n:6">
+              <template x-for="(s, i) in me.stages" :key="i"><div :class="i < p.stage ? 'done' : (i === p.stage ? 'now' : '')"><i></i><span x-text="s"></span></div></template>
+            </div>
+            <div class="row small muted" style="gap:20px">
+              <span x-show="p.pmName" x-text="'Your project manager: ' + p.pmName"></span>
+              <span x-show="p.targetDate" x-text="'Target date: ' + new Date(p.targetDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })"></span>
+            </div>
+            <div class="stack" style="gap:6px">
+              <h3 style="font-size:16px">Documents</h3>
+              <template x-for="d in p.docs" :key="d.id"><a class="rowline" :href="'/files/docs/' + d.id" style="text-decoration:none;font-weight:600;border-bottom:1px solid #EEF2F9"><span x-text="d.title"></span><span class="small muted">Download</span></a></template>
+              <div class="small muted" x-show="!p.docs.length">Documents like your quotation, layout and warranty cards will appear here.</div>
+            </div>
+          </section>
+        </template>
+        <div class="empty" x-show="!me.projects.length">Your project will appear here once the AVN team links it to your account.</div>
+
+        <div class="grid" style="--min:300px">
+          <section class="card stack" aria-label="Service request">
+            <h2 style="font-size:17px">Need help with your system?</h2>
+            <div class="ok" x-show="sent">Request sent. Our team will call you.</div>
+            <form class="stack" @submit.prevent="sendRequest()">
+              <label class="field" x-show="me.projects.length > 1">Project<select class="select" x-model="req.projectId"><template x-for="p in me.projects" :key="p.id"><option :value="p.id" x-text="p.name"></option></template></select></label>
+              <label class="field">What’s the problem?<textarea class="textarea" x-model="req.message" placeholder="e.g. Inverter shows an error light since yesterday" required></textarea></label>
+              <button class="btn dark" type="submit">Send request</button>
+            </form>
+            <template x-for="r in me.requests" :key="r.id"><div class="rowline small"><span x-text="r.message"></span><span class="badge" :class="r.status === 'closed' ? 'green' : 'amber'" x-text="r.status.replace('_', ' ')"></span></div></template>
+          </section>
+          <section class="card stack" aria-label="Contact" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+            <h2 style="font-size:17px">Talk to us</h2>
+            <p style="margin:0;color:#C9D0EC">Call or WhatsApp the AVN team, in Tamil or English.</p>
+            <div class="row">
+              <a class="btn primary" x-show="me.contact.phone" :href="'tel:+91' + me.contact.phone.replace(/\D/g, '').slice(-10)">Call</a>
+              <a class="btn" x-show="me.contact.whatsapp" :href="'https://wa.me/91' + me.contact.whatsapp.replace(/\D/g, '').slice(-10)" target="_blank" rel="noopener">WhatsApp</a>
+              <a class="btn" x-show="me.contact.email" :href="'mailto:' + me.contact.email">Email</a>
+            </div>
+          </section>
+        </div>
+      </div>
+    </template>
+  </main>
+</div>
+</body>
+</html>

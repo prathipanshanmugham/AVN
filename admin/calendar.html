@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Calendar — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/calendar.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="calendar" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">Calendar</h1><div class="sub">Site visits, installs, EB dates, deadlines and team checklists.</div></div>
+  </div>
+
+  <div class="split">
+    <section class="card stack detail" aria-label="Month" style="padding:16px">
+      <div class="row between">
+        <div class="row">
+          <button class="btn icon" type="button" @click="shift(-1)" aria-label="Previous month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 L9 12 L15 18"/></svg></button>
+          <h2 class="h2" style="min-width:180px;text-align:center" x-text="monthLabel"></h2>
+          <button class="btn icon" type="button" @click="shift(1)" aria-label="Next month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L15 12 L9 18"/></svg></button>
+          <button class="btn" type="button" @click="goToday()">Today</button>
+        </div>
+        <div class="row small" style="gap:6px 12px">
+          <template x-for="t in types" :key="t.id"><span class="row" style="gap:6px"><span class="ev" :class="'t-' + t.id" style="width:14px;padding:0;height:12px"></span><span x-text="t.name"></span></span></template>
+        </div>
+      </div>
+      <div class="month">
+        <template x-for="w in weekdays" :key="w"><span class="wd" x-text="w"></span></template>
+        <template x-for="c in cells" :key="c.iso">
+          <button type="button" class="day" :class="{ out: !c.inMonth, sel: c.iso === selected, today: c.iso === today }" @click="pick(c)" :aria-label="c.label">
+            <span class="n" x-text="c.day"></span>
+            <template x-for="e in c.events.slice(0, 2)" :key="e.id"><span class="ev" :class="'t-' + e.type" :style="e.done ? 'opacity:.55;text-decoration:line-through' : ''" x-text="e.title"></span></template>
+            <span class="small muted" style="font-weight:700;padding-left:4px" x-show="c.events.length > 2" x-text="'+' + (c.events.length - 2) + ' more'"></span>
+          </button>
+        </template>
+      </div>
+    </section>
+
+    <div class="list stack">
+      <section class="card stack" aria-label="Selected day">
+        <h2 style="font-size:17px" x-text="selectedLabel"></h2>
+        <template x-for="e in dayEvents" :key="e.id">
+          <div class="row" style="flex-wrap:nowrap;align-items:flex-start;padding:10px;border-radius:14px" :class="'t-' + e.type">
+            <input type="checkbox" :checked="e.done" @change="toggleEvent(e)" :aria-label="'Done: ' + e.title" style="width:20px;height:20px;margin-top:2px;accent-color:var(--ink)">
+            <span style="flex:1;min-width:0"><b :style="e.done ? 'text-decoration:line-through' : ''" x-text="e.title"></b><br><span class="small" x-text="[typeName(e.type), e.time, e.who, e.projectName].filter(Boolean).join(' · ')"></span></span>
+            <button class="btn sm" type="button" style="background:transparent;border:0" @click="removeEvent(e)" :aria-label="'Delete ' + e.title">✕</button>
+          </div>
+        </template>
+        <div class="empty small" x-show="!dayEvents.length">Nothing planned.</div>
+        <form class="stack" @submit.prevent="addEvent()" style="border-top:1px solid var(--line);padding-top:12px">
+          <label class="field">New event on this day<input class="input" x-model="ev.title" placeholder="Site visit — Karthik R" required></label>
+          <div class="grid" style="--min:110px;gap:8px">
+            <label class="field">Type<select class="select" x-model="ev.type"><template x-for="t in types" :key="t.id"><option :value="t.id" x-text="t.name"></option></template></select></label>
+            <label class="field">Time<input class="input" type="time" x-model="ev.time"></label>
+            <label class="field">Who<input class="input" x-model="ev.who" placeholder="Name / crew"></label>
+          </div>
+          <button class="btn dark" type="submit">Add event</button>
+        </form>
+      </section>
+
+      <section class="card stack" aria-label="Deadlines" style="background:var(--ink);color:#fff;border-color:var(--ink)">
+        <div class="row between"><h2 style="font-size:17px">Deadlines</h2><span class="small" style="color:#C9D0EC">Open, next 20</span></div>
+        <template x-for="d in deadlines" :key="d.id">
+          <div class="rowline" style="border-bottom:1px solid #2A3470">
+            <span><b x-text="d.title"></b><br><span class="small" style="color:#A9B2D6" x-text="AVN.date(d.date)"></span></span>
+            <span class="badge" :class="deadlineClass(d)" x-text="deadlineLabel(d)"></span>
+          </div>
+        </template>
+        <div class="small" style="color:#C9D0EC" x-show="!deadlines.length">No open deadlines. Add an event of type Deadline.</div>
+      </section>
+    </div>
+  </div>
+
+  <section class="stack" aria-label="Checklists">
+    <div class="row between">
+      <h2 class="h2">Checklists</h2>
+      <form class="row" style="flex-wrap:nowrap;flex:0 1 460px;min-width:260px" @submit.prevent="addNote()">
+        <label class="sr-only" for="newnote">New checklist title</label>
+        <input id="newnote" class="input" x-model="noteTitle" placeholder="Take a note… (checklist title)">
+        <button class="btn dark" type="submit">Add</button>
+      </form>
+    </div>
+    <div class="notes">
+      <template x-for="n in notes" :key="n.id">
+        <article class="note" :class="'c-' + n.color">
+          <div class="row between" style="flex-wrap:nowrap;align-items:baseline">
+            <h3 style="font-size:16px" x-text="n.title"></h3>
+            <span class="small" style="font-weight:700" x-text="n.items.filter(i => i.done).length + '/' + n.items.length"></span>
+          </div>
+          <template x-for="it in n.items" :key="it.id">
+            <div class="row" style="flex-wrap:nowrap;gap:4px">
+              <label class="check" :class="it.done && 'done'" style="flex:1"><input type="checkbox" :checked="it.done" @change="toggleItem(it)"><span x-text="it.label"></span></label>
+              <button type="button" class="link small" style="color:var(--muted)" @click="removeItem(n, it)" :aria-label="'Remove ' + it.label">✕</button>
+            </div>
+          </template>
+          <form class="row" style="flex-wrap:nowrap;gap:6px" @submit.prevent="addItem(n, $event)">
+            <label class="sr-only" :for="'it' + n.id">Add item</label>
+            <input :id="'it' + n.id" class="input" name="label" placeholder="+ List item" style="min-height:38px;background:rgba(255,255,255,.7)">
+          </form>
+          <div class="row between" style="margin-top:4px">
+            <label class="row small" style="gap:6px;font-weight:700">Due<input type="date" class="input" style="min-height:34px;width:auto;padding:0 8px;background:rgba(255,255,255,.7)" :value="n.dueDate" @change="setNote(n, { dueDate: $event.target.value })"></label>
+            <div class="row" style="gap:4px">
+              <template x-for="c in colors" :key="c"><button type="button" :class="'c-' + c" :aria-label="'Colour ' + c" @click="setNote(n, { color: c })" class="swatch" :style="{ borderColor: n.color === c ? '#111847' : '#D3DAE8' }"></button></template>
+              <button type="button" class="link small" style="color:var(--red-fg);margin-left:6px" @click="removeNote(n)">Delete</button>
+            </div>
+          </div>
+        </article>
+      </template>
+    </div>
+    <div class="empty" x-show="!notes.length">No checklists yet. Type a title above to start one.</div>
+  </section>
+</main>
+</div>
+</body>
+</html>

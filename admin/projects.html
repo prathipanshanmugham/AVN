@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Projects — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/projects.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="projects" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">Projects</h1><div class="sub">Six stages from survey to switch-on, for every site.</div></div>
+    <button class="btn primary" type="button" @click="openForm()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>New project</button>
+  </div>
+
+  <div class="split">
+    <div class="list stack">
+      <div class="tabs" role="group" aria-label="Show">
+        <template x-for="t in tabs" :key="t[0]"><button type="button" :class="tab === t[0] && 'on'" :aria-pressed="tab === t[0]" @click="tab = t[0]" x-text="t[1]"></button></template>
+      </div>
+      <label class="search" style="min-width:0"><span class="sr-only">Search projects</span><input type="search" placeholder="Search projects" x-model="q"></label>
+      <template x-for="p in list" :key="p.id">
+        <button type="button" class="item" :class="cur && cur.project.id === p.id && 'on'" @click="select(p.id)">
+          <span class="row between" style="flex-wrap:nowrap;align-items:baseline"><b x-text="p.name"></b><span class="small" :style="late(p) ? 'color:var(--red-fg);font-weight:700' : 'color:var(--muted)'" x-text="dueText(p)"></span></span>
+          <span class="small muted" x-text="[p.place, p.kwp, p.type].filter(Boolean).join(' · ')"></span>
+          <span class="row" style="flex-wrap:nowrap"><span class="bar" style="flex:1"><span :style="'width:' + pct(p) + '%;' + (p.stage >= 6 ? 'background:var(--green)' : '')"></span></span><span class="badge" x-text="stageName(p.stage)"></span></span>
+        </button>
+      </template>
+      <div class="empty" x-show="!list.length">No projects here yet. Win a lead in the CRM or add one.</div>
+    </div>
+
+    <section class="detail stack" aria-label="Project details">
+      <template x-if="!cur"><div class="empty">Select a project to see its stages, checklist and documents.</div></template>
+      <template x-if="cur">
+        <div class="stack" style="gap:16px">
+          <div class="card stack">
+            <div class="row between" style="align-items:flex-start">
+              <div>
+                <div class="eyebrow" x-text="cur.project.type || 'Project'"></div>
+                <h2 class="h2" x-text="cur.project.name"></h2>
+                <div class="muted" x-text="[cur.project.place, cur.project.kwp, AVN.money(cur.project.value)].filter(Boolean).join(' · ')"></div>
+              </div>
+              <div class="row">
+                <button class="btn sm" type="button" @click="openForm(cur.project)">Edit</button>
+                <button class="btn sm danger" type="button" @click="remove()">Delete</button>
+              </div>
+            </div>
+            <div class="row" style="gap:24px">
+              <span><span class="small muted">Project manager</span><br><b x-text="cur.project.pmName || '—'"></b></span>
+              <span><span class="small muted">Target date</span><br><b x-text="cur.project.targetDate ? AVN.date(cur.project.targetDate) : '—'"></b></span>
+              <span><span class="small muted">Client login</span><br><b x-text="cur.project.clientName ? cur.project.clientName + ' (' + cur.project.clientCode + ')' : 'Not linked'"></b></span>
+            </div>
+            <div class="steps" style="--n:6">
+              <template x-for="(s, i) in stages" :key="i">
+                <div :class="i < cur.project.stage ? 'done' : (i === cur.project.stage ? 'now' : '')"><i></i><button type="button" class="link small" style="text-align:left;font-weight:inherit;color:inherit" @click="view = i" x-text="s"></button></div>
+              </template>
+            </div>
+          </div>
+
+          <div class="grid" style="--min:300px">
+            <div class="card stack">
+              <div class="row between"><h3 x-text="(cur.project.stage >= 6 && view === null ? 'Handover' : stages[viewStage]) + ' checklist'"></h3><span class="small muted" x-text="stageDone + ' of ' + stageTasks.length + ' done'"></span></div>
+              <div class="bar"><span :style="'width:' + (stageTasks.length ? Math.round(stageDone / stageTasks.length * 100) : 0) + '%;background:var(--green)'"></span></div>
+              <div>
+                <template x-for="t in stageTasks" :key="t.id">
+                  <label class="check" :class="t.done && 'done'"><input type="checkbox" :checked="t.done" @change="toggle(t)"><span x-text="t.label"></span></label>
+                </template>
+              </div>
+              <form class="row" style="flex-wrap:nowrap" @submit.prevent="addTask()"><label class="sr-only" for="task">Add a task</label><input id="task" class="input" x-model="newTask" placeholder="Add a task to this stage"><button class="btn" type="submit">Add</button></form>
+              <button class="btn dark" type="button" x-show="cur.project.stage < 6 && viewStage === cur.project.stage" @click="advance()" x-text="cur.project.stage === 5 ? 'Complete handover' : 'Complete stage → ' + stages[cur.project.stage + 1]"></button>
+              <div class="ok" x-show="cur.project.stage >= 6">Project handed over.</div>
+            </div>
+
+            <div class="card stack">
+              <div class="row between"><h3>Documents</h3><span class="small muted">Ticked ones show in the client portal</span></div>
+              <div class="rows">
+                <template x-for="d in cur.docs" :key="d.id">
+                  <div class="rowline">
+                    <a :href="'/files/docs/' + d.id" x-text="d.title" style="font-weight:600"></a>
+                    <span class="row" style="flex-wrap:nowrap">
+                      <label class="row small" style="gap:6px;cursor:pointer"><input type="checkbox" :checked="d.clientVisible" @change="toggleDoc(d)">Client</label>
+                      <button class="btn sm danger" type="button" @click="removeDoc(d)" :aria-label="'Delete ' + d.title">✕</button>
+                    </span>
+                  </div>
+                </template>
+              </div>
+              <div class="empty small" x-show="!cur.docs.length">No documents yet</div>
+              <form class="stack" @submit.prevent="upload($event)">
+                <input class="input" name="title" placeholder="Title, e.g. Quotation" x-model="docTitle">
+                <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx" required>
+                <label class="row small" style="gap:6px"><input type="checkbox" x-model="docVisible">Show to client</label>
+                <button class="btn" type="submit" :disabled="uploading" x-text="uploading ? 'Uploading…' : 'Upload document'"></button>
+              </form>
+            </div>
+
+            <div class="card stack" x-show="cur.requests.length">
+              <h3>Service requests from client</h3>
+              <template x-for="r in cur.requests" :key="r.id">
+                <div class="rowline" style="align-items:flex-start"><span><span x-text="r.message"></span><br><span class="small muted" x-text="r.clientName + ' · ' + AVN.when(r.createdAt)"></span></span><span class="badge" :class="r.status === 'closed' ? 'green' : 'amber'" x-text="r.status.replace('_', ' ')"></span></div>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </section>
+  </div>
+
+  <div class="overlay center" x-show="formOpen" x-transition.opacity @click.self="formOpen = false">
+    <form class="modal" @submit.prevent="saveForm()">
+      <h2 class="h2" x-text="form.id ? 'Edit project' : 'New project'"></h2>
+      <div class="error" x-show="error" x-text="error"></div>
+      <div class="grid" style="--min:180px">
+        <label class="field" style="grid-column:1/-1">Project name<input class="input" x-model="form.name" required></label>
+        <label class="field">Place<input class="input" x-model="form.place"></label>
+        <label class="field">Size<input class="input" x-model="form.kwp" placeholder="5 kWp"></label>
+        <label class="field">Type<select class="select" x-model="form.type"><template x-for="t in projectTypes" :key="t"><option :value="t" x-text="t"></option></template></select></label>
+        <label class="field">Value (₹ lakh)<input class="input" type="number" step="0.1" min="0" x-model="form.value"></label>
+        <label class="field">Project manager<select class="select" x-model="form.pmId"><option value="">—</option><template x-for="m in team" :key="m.id"><option :value="m.id" x-text="m.name"></option></template></select></label>
+        <label class="field">Target date<input class="input" type="date" x-model="form.targetDate"></label>
+        <label class="field" x-show="clients.length" style="grid-column:1/-1">Client login<select class="select" x-model="form.clientId"><option value="">Not linked</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name + ' · ' + c.customerId"></option></template></select></label>
+      </div>
+      <div class="row"><button class="btn dark" type="submit">Save</button><button class="btn" type="button" @click="formOpen = false">Cancel</button></div>
+    </form>
+  </div>
+</main>
+</div>
+</body>
+</html>

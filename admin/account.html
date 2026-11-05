@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>My account — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/account.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="account" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">My account</h1><div class="sub" x-text="$store.app.user.name + ' · ' + ($store.app.user.role === 'admin' ? 'Admin' : 'Staff') + ' · @' + $store.app.user.username"></div></div>
+  </div>
+  <div class="card stack" style="max-width:520px">
+    <template x-if="$store.app.user.mustChange">
+      <div class="ok" style="background:var(--amber-bg);color:var(--amber-fg)">You are signed in with a temporary password. Set your own password to continue.</div>
+    </template>
+    <h2 class="h2">Change password</h2>
+    <div class="error" x-show="error" x-text="error" role="alert"></div>
+    <form class="stack" @submit.prevent="save">
+      <label class="field">Current password<input class="input" type="password" x-model="current" autocomplete="current-password" required></label>
+      <label class="field">New password <small>At least 10 characters</small><input class="input" type="password" x-model="next" autocomplete="new-password" minlength="10" required></label>
+      <label class="field">Repeat new password<input class="input" type="password" x-model="repeat" autocomplete="new-password" required></label>
+      <button class="btn dark" type="submit" :disabled="busy">Save new password</button>
+    </form>
+  </div>
+</main>
+</div>
+</body>
+</html>
