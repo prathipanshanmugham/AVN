@@ -58,6 +58,10 @@ REPO=https://<github-user>:<token>@github.com/prathipanshanmugham/avn.git bash s
 
 The script installs Node 22, Nginx, ffmpeg and PM2, clones the repo to `/var/www/avn`, writes `.env` with a random `SESSION_SECRET`, starts the app, sets up Nginx + a free Let's Encrypt certificate, the firewall and a daily 2:30 AM backup (`data/backups`, kept 14 days).
 
+**Domain or IP later:** `bash /var/www/avn/deploy/set-domain.sh avnsolar.in` (or the server IP for plain HTTP). It only changes AVN's own Nginx site and fetches the HTTPS certificate.
+
+The setup script is safe on a server that already hosts other sites: it picks a free port, adds its own Nginx site, runs under its own `avn` user and PM2, and leaves the firewall alone if it isn't active.
+
 **Updating later:** `bash /var/www/avn/deploy/update.sh`
 
 **Locked out?** On the server: `cd /var/www/avn && sudo -u avn npm run admin:reset` prints a new temporary admin password.

@@ -1,32 +1,29 @@
 #!/usr/bin/env bash
-# One-time setup of AVN on a fresh Hostinger VPS (Ubuntu 22.04 / 24.04). Run as root:
+# One-time setup of AVN on a Hostinger VPS (Ubuntu 22.04 / 24.04). Safe on a server that already hosts
+# other sites: it adds its own Nginx site, picks a free port and does not touch other apps. Run as root:
 #
-#   DOMAIN=avnsolar.in ADMIN_PASSWORD='your-first-admin-password' \
-#   REPO=https://github.com/prathipanshanmugham/avn.git bash setup-vps.sh
+#   DOMAIN=avnsolar.in ADMIN_PASSWORD='first-admin-password' \
+#   REPO="https://<github-user>:<token>@github.com/prathipanshanmugham/AVN.git" bash setup-vps.sh
 #
-# For a private repo, use a URL with a GitHub token or set up a deploy key first, e.g.
-#   REPO=https://<github-username>:<personal-access-token>@github.com/prathipanshanmugham/avn.git
+# DOMAIN can also be the server's IP address (plain HTTP) until the domain points here.
 set -euo pipefail
 
-: "${DOMAIN:?Set DOMAIN, e.g. DOMAIN=avnsolar.in}"
+: "${DOMAIN:?Set DOMAIN, e.g. DOMAIN=avnsolar.in (or the server IP)}"
 : "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD for the first admin login}"
-REPO="${REPO:-https://github.com/prathipanshanmugham/avn.git}"
+REPO="${REPO:-https://github.com/prathipanshanmugham/AVN.git}"
 APP_DIR=/var/www/avn
-IS_IP=0
-if [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then IS_IP=1; fi
 APP_USER=avn
-EMAIL="${EMAIL:-admin@$DOMAIN}"
 
 echo "==> Installing system packages"
 apt-get update -y
-apt-get install -y curl git nginx ffmpeg ufw certbot python3-certbot-nginx build-essential
+apt-get install -y curl git nginx ffmpeg certbot python3-certbot-nginx build-essential
 
 if ! command -v node >/dev/null || [ "$(node -v | cut -d. -f1 | tr -d v)" -lt 20 ]; then
-  echo "==> Installing Node.js 22"
+  echo "==> Installing Node.js 22 (other Node apps on this server will also use Node 22 after their next restart)"
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs
 fi
-npm install -g pm2
+command -v pm2 >/dev/null || npm install -g pm2
 
 echo "==> Creating app user and folder"
 id -u "$APP_USER" >/dev/null 2>&1 || useradd --system --create-home --shell /bin/bash "$APP_USER"
@@ -43,12 +40,15 @@ cd "$APP_DIR"
 sudo -u "$APP_USER" npm ci --omit=dev
 
 if [ ! -f .env ]; then
-  echo "==> Writing .env"
+  # First free port from 3000 up, so we never collide with another app on this server.
+  PORT="${PORT:-3000}"
+  while ss -ltnH "( sport = :$PORT )" | grep -q .; do PORT=$((PORT + 1)); done
+  echo "==> Writing .env (app port $PORT)"
   cat > .env <<EOF
 NODE_ENV=production
-PORT=3000
+PORT=$PORT
 HOST=127.0.0.1
-HTTPS_ONLY=$([ "$IS_IP" = 1 ] && echo 0 || echo 1)
+HTTPS_ONLY=0
 SESSION_SECRET=$(openssl rand -hex 32)
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=$ADMIN_PASSWORD
@@ -58,48 +58,29 @@ EOF
   chown "$APP_USER":"$APP_USER" .env
   chmod 600 .env
 fi
-
 sudo -u "$APP_USER" mkdir -p data/logs uploads
 
-echo "==> Starting the app with PM2"
-sudo -u "$APP_USER" pm2 start deploy/ecosystem.config.cjs
+echo "==> Starting the app with PM2 (runs as user $APP_USER, separate from any root PM2 apps)"
+if sudo -u "$APP_USER" pm2 describe avn >/dev/null 2>&1; then
+  sudo -u "$APP_USER" pm2 reload avn --update-env
+else
+  sudo -u "$APP_USER" pm2 start deploy/ecosystem.config.cjs
+fi
 sudo -u "$APP_USER" pm2 save
 env PATH="$PATH" pm2 startup systemd -u "$APP_USER" --hp "/home/$APP_USER" >/dev/null
 
-echo "==> Configuring Nginx for $DOMAIN"
-if [ "$IS_IP" = 1 ]; then
-  sed "s/server_name __DOMAIN__ www.__DOMAIN__;/server_name $DOMAIN _;/" deploy/nginx-avn.conf > /etc/nginx/sites-available/avn
-else
-  sed "s/__DOMAIN__/$DOMAIN/g" deploy/nginx-avn.conf > /etc/nginx/sites-available/avn
-fi
-ln -sf /etc/nginx/sites-available/avn /etc/nginx/sites-enabled/avn
-rm -f /etc/nginx/sites-enabled/default
-nginx -t && systemctl reload nginx
-
 echo "==> Firewall"
-ufw allow OpenSSH
-ufw allow 'Nginx Full'
-ufw --force enable
-
-if [ "$IS_IP" = 1 ]; then
-  echo "==> Running on the IP address over plain HTTP. Re-run this script with DOMAIN=yourdomain once DNS points here to get HTTPS."
+if ufw status | grep -q "Status: active"; then
+  ufw allow OpenSSH >/dev/null
+  ufw allow 'Nginx Full' >/dev/null
 else
-  echo "==> HTTPS certificate (make sure $DOMAIN and www.$DOMAIN point to this server first)"
-  if ! certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect; then
-    echo "!! Certbot failed — the site runs on plain HTTP for now."
-    echo "   Fix DNS, then run: certbot --nginx -d $DOMAIN -d www.$DOMAIN && sed -i 's/^HTTPS_ONLY=0/HTTPS_ONLY=1/' $APP_DIR/.env && sudo -u $APP_USER pm2 restart avn"
-    sed -i 's/^HTTPS_ONLY=1/HTTPS_ONLY=0/' .env
-    sudo -u "$APP_USER" pm2 restart avn
-  elif grep -q '^HTTPS_ONLY=0' .env; then
-    sed -i 's/^HTTPS_ONLY=0/HTTPS_ONLY=1/' .env
-    sudo -u "$APP_USER" pm2 restart avn
-  fi
+  echo "   ufw is not active — leaving it as it is."
 fi
+
+bash "$APP_DIR/deploy/set-domain.sh" "$DOMAIN"
 
 echo "==> Daily backup at 2:30 AM"
 ( crontab -u "$APP_USER" -l 2>/dev/null | grep -v avn-backup; echo "30 2 * * * cd $APP_DIR && /usr/bin/node scripts/backup.js >> $APP_DIR/data/backup.log 2>&1 # avn-backup" ) | crontab -u "$APP_USER" -
 
 echo
-SCHEME=$(grep -q '^HTTPS_ONLY=1' .env && echo https || echo http)
-echo "Done. Website: $SCHEME://$DOMAIN   Staff: $SCHEME://$DOMAIN/admin   Customers: $SCHEME://$DOMAIN/portal"
-echo "Sign in as 'admin' with the ADMIN_PASSWORD you provided — you'll be asked to set a new one."
+echo "Sign in at /admin as 'admin' with the ADMIN_PASSWORD you provided — you'll be asked to set a new one."
