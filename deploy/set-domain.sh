@@ -7,7 +7,7 @@
 # Only touches AVN's own Nginx site (/etc/nginx/sites-available/avn); other sites on the server are left alone.
 set -euo pipefail
 
-DOMAIN="${1:?Usage: set-domain.sh yourdomain.in   (or the server IP)}"
+DOMAIN="${1:-avnsolar.in}"
 APP_DIR=/var/www/avn
 APP_USER=avn
 CONF=/etc/nginx/sites-available/avn

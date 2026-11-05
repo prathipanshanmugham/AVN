@@ -8,7 +8,7 @@
 # DOMAIN can also be the server's IP address (plain HTTP) until the domain points here.
 set -euo pipefail
 
-: "${DOMAIN:?Set DOMAIN, e.g. DOMAIN=avnsolar.in (or the server IP)}"
+DOMAIN="${DOMAIN:-avnsolar.in}"
 : "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD for the first admin login}"
 REPO="${REPO:-https://github.com/prathipanshanmugham/AVN.git}"
 APP_DIR=/var/www/avn
