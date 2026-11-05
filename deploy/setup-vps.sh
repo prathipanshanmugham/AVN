@@ -12,6 +12,8 @@ set -euo pipefail
 : "${ADMIN_PASSWORD:?Set ADMIN_PASSWORD for the first admin login}"
 REPO="${REPO:-https://github.com/prathipanshanmugham/avn.git}"
 APP_DIR=/var/www/avn
+IS_IP=0
+if [[ "$DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then IS_IP=1; fi
 APP_USER=avn
 EMAIL="${EMAIL:-admin@$DOMAIN}"
 
@@ -46,7 +48,7 @@ if [ ! -f .env ]; then
 NODE_ENV=production
 PORT=3000
 HOST=127.0.0.1
-HTTPS_ONLY=1
+HTTPS_ONLY=$([ "$IS_IP" = 1 ] && echo 0 || echo 1)
 SESSION_SECRET=$(openssl rand -hex 32)
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=$ADMIN_PASSWORD
@@ -65,7 +67,11 @@ sudo -u "$APP_USER" pm2 save
 env PATH="$PATH" pm2 startup systemd -u "$APP_USER" --hp "/home/$APP_USER" >/dev/null
 
 echo "==> Configuring Nginx for $DOMAIN"
-sed "s/__DOMAIN__/$DOMAIN/g" deploy/nginx-avn.conf > /etc/nginx/sites-available/avn
+if [ "$IS_IP" = 1 ]; then
+  sed "s/server_name __DOMAIN__ www.__DOMAIN__;/server_name $DOMAIN _;/" deploy/nginx-avn.conf > /etc/nginx/sites-available/avn
+else
+  sed "s/__DOMAIN__/$DOMAIN/g" deploy/nginx-avn.conf > /etc/nginx/sites-available/avn
+fi
 ln -sf /etc/nginx/sites-available/avn /etc/nginx/sites-enabled/avn
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
@@ -75,13 +81,25 @@ ufw allow OpenSSH
 ufw allow 'Nginx Full'
 ufw --force enable
 
-echo "==> HTTPS certificate (make sure $DOMAIN and www.$DOMAIN point to this server first)"
-certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect || \
-  echo "!! Certbot failed — check DNS, then run: certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+if [ "$IS_IP" = 1 ]; then
+  echo "==> Running on the IP address over plain HTTP. Re-run this script with DOMAIN=yourdomain once DNS points here to get HTTPS."
+else
+  echo "==> HTTPS certificate (make sure $DOMAIN and www.$DOMAIN point to this server first)"
+  if ! certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos -m "$EMAIL" --redirect; then
+    echo "!! Certbot failed — the site runs on plain HTTP for now."
+    echo "   Fix DNS, then run: certbot --nginx -d $DOMAIN -d www.$DOMAIN && sed -i 's/^HTTPS_ONLY=0/HTTPS_ONLY=1/' $APP_DIR/.env && sudo -u $APP_USER pm2 restart avn"
+    sed -i 's/^HTTPS_ONLY=1/HTTPS_ONLY=0/' .env
+    sudo -u "$APP_USER" pm2 restart avn
+  elif grep -q '^HTTPS_ONLY=0' .env; then
+    sed -i 's/^HTTPS_ONLY=0/HTTPS_ONLY=1/' .env
+    sudo -u "$APP_USER" pm2 restart avn
+  fi
+fi
 
 echo "==> Daily backup at 2:30 AM"
 ( crontab -u "$APP_USER" -l 2>/dev/null | grep -v avn-backup; echo "30 2 * * * cd $APP_DIR && /usr/bin/node scripts/backup.js >> $APP_DIR/data/backup.log 2>&1 # avn-backup" ) | crontab -u "$APP_USER" -
 
 echo
-echo "Done. Website: https://$DOMAIN   Staff: https://$DOMAIN/admin   Customers: https://$DOMAIN/portal"
+SCHEME=$(grep -q '^HTTPS_ONLY=1' .env && echo https || echo http)
+echo "Done. Website: $SCHEME://$DOMAIN   Staff: $SCHEME://$DOMAIN/admin   Customers: $SCHEME://$DOMAIN/portal"
 echo "Sign in as 'admin' with the ADMIN_PASSWORD you provided — you'll be asked to set a new one."
