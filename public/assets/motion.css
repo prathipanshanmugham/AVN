@@ -34,6 +34,14 @@
 @keyframes avn-par{from{transform:translateY(90px)}to{transform:translateY(-90px)}}
 @keyframes avn-par-rot{from{transform:rotate(-50deg)}to{transform:rotate(90deg)}}
 @keyframes avn-ringdraw{from{stroke-dashoffset:340}to{stroke-dashoffset:0}}
+@keyframes avn-word{from{transform:translateY(105%);opacity:0}to{transform:none;opacity:1}}
+@keyframes avn-kenburns{from{transform:scale(1.02)}to{transform:scale(1.14) translate(-1.5%,-1%)}}
+@keyframes avn-wiggle{0%,84%,100%{rotate:0deg;scale:1}87%{rotate:-3deg;scale:1.05}90%{rotate:3deg;scale:1.05}93%{rotate:-2deg;scale:1.05}96%{rotate:1deg;scale:1}}
+@keyframes avn-ringpulse{0%{transform:scale(1);opacity:.75}100%{transform:scale(1.35,1.6);opacity:0}}
+@keyframes avn-chip{from{opacity:0;transform:translateY(14px) scale(.9)}to{opacity:1;transform:none}}
+@keyframes avn-wiz-in{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
+@keyframes avn-hero-par{to{transform:translateY(110px) scale(1.08)}}
+@keyframes avn-band{from{transform:translateY(-7%)}to{transform:translateY(7%)}}
 @keyframes avn-n-78{from{--avn-n:0}to{--avn-n:78}}
 @keyframes avn-n-4{from{--avn-n:0}to{--avn-n:4}}
 @keyframes avn-n-25{from{--avn-n:0}to{--avn-n:25}}
@@ -102,6 +110,18 @@
 .avn-ans{animation:avn-fade .45s ease both}
 .avn-dash-flow{animation:avn-dash 1.4s linear infinite}
 
+.rot{animation:avn-word .6s cubic-bezier(.2,.75,.15,1) both}
+.hero-slide.on{animation:avn-kenburns 9s ease-out both}
+.avn-wiggle{animation:avn-wiggle 6s ease-in-out infinite 2.5s}
+.wa-float{animation:avn-wiggle 8s ease-in-out infinite 5s}
+.wa-ring{animation:avn-ringpulse 2.4s ease-out infinite}
+.wa-ring-2{animation-delay:1.2s}
+.avn-chip-in{animation:avn-chip .6s cubic-bezier(.2,.75,.15,1) both .9s}
+.avn-chip-2{animation-delay:1.05s}
+.avn-chip-3{animation-delay:1.2s}
+.wiz-step{animation:avn-wiz-in .45s cubic-bezier(.2,.75,.15,1) both}
+.wiz-tile:active,.wiz-chip:active{scale:.96}
+
 /* hover */
 .avn-lift{transition:transform .35s cubic-bezier(.2,.75,.15,1),box-shadow .35s ease}
 .avn-lift:hover{transform:translateY(-10px);box-shadow:0 28px 56px rgba(17,24,71,.14)}
@@ -152,6 +172,8 @@
 .avn-st-6{animation-range:entry 46% cover 54%}
 .avn-grow-rv{transform-origin:0 50%;animation:avn-grow linear both;animation-timeline:view();animation-range:entry 30% cover 50%}
 .avn-progress{animation:avn-grow linear both;animation-timeline:scroll(nearest block)}
+.hero-bg{animation:avn-hero-par linear both;animation-timeline:scroll(root block);animation-range:0px 900px}
+.avn-band-par{animation:avn-band linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
 .avn-ring-out{animation:avn-ring-out linear both;animation-timeline:scroll(nearest block);animation-range:0px 900px}
 .avn-scrub-l{animation:avn-scrub-l linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
 .avn-scrub-r{animation:avn-scrub-r linear both;animation-timeline:view();animation-range:cover 0% cover 100%}

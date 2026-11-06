@@ -29,6 +29,9 @@
           <span class="small muted" x-text="s.desc"></span>
         </button>
       </template>
+      <div class="card tight small" style="background:#FFF4C2;border-color:#FFE59A" x-show="sec !== 'brands'">
+        <b>Photos that sell.</b> Your own finished sites build the most trust. For extra shots, free-licence libraries like pexels.com and unsplash.com have good “rooftop solar” photos. Use landscape images at least 1920 px wide.
+      </div>
       <div class="card tight small" style="background:#E6F2FC;border-color:#E6F2FC">
         <b>Kept fast automatically.</b> Photos are resized and saved as WebP.
         <span x-show="ffmpeg">Videos are compressed to a muted 720p clip with a preview image.</span>
@@ -41,7 +44,7 @@
       <div class="media-grid">
         <label class="drop" :class="hot && 'hot'" @dragover.prevent="hot = true" @dragleave="hot = false" @drop.prevent="hot = false; upload($event.dataTransfer.files)">
           <b x-text="uploading ? 'Uploading…' : 'Drop photos or videos'"></b>
-          <span class="small muted">JPG, PNG, WebP, MP4, MOV</span>
+          <span class="small muted" x-text="sec === 'banner' ? 'Wide JPG, PNG or WebP photos' : 'JPG, PNG, WebP, MP4, MOV'"></span>
           <span class="btn sm">Browse files</span>
           <input type="file" class="sr-only" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" multiple @change="upload($event.target.files); $event.target.value = ''">
         </label>
@@ -69,7 +72,7 @@
           </span>
           <label class="field">Title<input class="input" x-model="cur.title" @change="save({ title: cur.title })"></label>
           <label class="field">Alt text <small>Describes the photo for Google and screen readers</small><textarea class="textarea" x-model="cur.alt" @change="save({ alt: cur.alt })"></textarea></label>
-          <label class="field">Section<select class="select" :value="cur.section" @change="save({ section: $event.target.value })"><template x-for="s in sections.slice(0, 3)" :key="s.id"><option :value="s.id" x-text="s.name"></option></template></select></label>
+          <label class="field">Section<select class="select" @change="save({ section: $event.target.value })"><template x-for="s in mediaSections" :key="s.id"><option :value="s.id" x-text="s.name" :selected="s.id === cur.section"></option></template></select></label>
           <div class="rowline"><b>Show on website</b><button type="button" class="switch" role="switch" :aria-checked="cur.visible.toString()" aria-label="Show on website" @click="save({ visible: !cur.visible })"></button></div>
           <div class="ok small" x-show="cur.originalSize && cur.size && cur.originalSize > cur.size" x-text="'Optimised: ' + AVN.bytes(cur.originalSize) + ' → ' + AVN.bytes(cur.size)"></div>
           <div class="row">
@@ -81,19 +84,38 @@
       </template>
     </aside>
 
-    <section class="detail grid" style="--min:280px" aria-label="Brand ribbons" x-show="sec === 'brands'">
+    <section class="detail stack" aria-label="Brand logos" x-show="sec === 'brands'">
+      <div class="card tight small" style="background:#E6F2FC;border-color:#E6F2FC">
+        Logos show on white tiles in the two moving ribbons. Use the brand’s official logo file (PNG with a transparent background or SVG works best) — ask your distributor for it.
+        Brands without a logo show their name until one is uploaded.
+      </div>
       <template x-for="g in brandGroups" :key="g.id">
         <div class="card stack">
-          <h2 style="font-size:17px" x-text="g.name"></h2>
-          <div class="chips">
-            <template x-for="b in brands.filter(x => x.grp === g.id)" :key="b.id">
-              <span class="badge" style="font-size:14px;padding:4px 4px 4px 12px;background:var(--ground);border:1px solid var(--line)"><span x-text="b.name"></span><button type="button" class="link" style="color:var(--muted);padding:4px 8px" @click="removeBrand(b)" :aria-label="'Remove ' + b.name">✕</button></span>
+          <div class="row between"><h2 style="font-size:17px" x-text="g.name"></h2><span class="small muted" x-text="brandsIn(g.id).filter(b => b.logo).length + ' of ' + brandsIn(g.id).length + ' have logos'"></span></div>
+          <label class="drop" style="min-height:96px" :class="hot === g.id && 'hot'" @dragover.prevent="hot = g.id" @dragleave="hot = false" @drop.prevent="hot = false; bulkLogos(g.id, $event.dataTransfer.files)">
+            <b x-text="uploading ? 'Uploading…' : 'Drop several logo files at once'"></b>
+            <span class="small muted">Name each file after the brand, e.g. <code>waaree.png</code>, <code>tata-power-solar.svg</code></span>
+            <input type="file" class="sr-only" multiple accept="image/png,image/svg+xml,image/jpeg,image/webp" @change="bulkLogos(g.id, $event.target.files); $event.target.value = ''">
+          </label>
+          <div class="rows">
+            <template x-for="(b, i) in brandsIn(g.id)" :key="b.id">
+              <div class="brand-row">
+                <span class="logo-box"><template x-if="b.logo"><img :src="b.logo" :alt="b.name + ' logo'"></template><span x-show="!b.logo" class="small muted">No logo</span></span>
+                <label class="sr-only" :for="'bn' + b.id">Brand name</label>
+                <input :id="'bn' + b.id" class="input" :value="b.name" @change="renameBrand(b, $event.target.value)">
+                <span class="row" style="flex-wrap:nowrap;gap:6px">
+                  <label class="btn sm" :class="b.busy && 'busy'"><span x-text="b.busy ? 'Saving…' : (b.logo ? 'Replace logo' : 'Upload logo')"></span><input type="file" class="sr-only" accept="image/png,image/svg+xml,image/jpeg,image/webp" @change="uploadLogo(b, $event.target.files[0]); $event.target.value = ''"></label>
+                  <button class="btn sm" type="button" x-show="b.logo" @click="removeLogo(b)">Remove logo</button>
+                  <button class="btn sm icon" type="button" :disabled="i === 0" @click="moveBrand(b, -1)" :aria-label="'Move ' + b.name + ' earlier'">↑</button>
+                  <button class="btn sm icon" type="button" :disabled="i === brandsIn(g.id).length - 1" @click="moveBrand(b, 1)" :aria-label="'Move ' + b.name + ' later'">↓</button>
+                  <button class="btn sm danger icon" type="button" @click="removeBrand(b)" :aria-label="'Remove ' + b.name">✕</button>
+                </span>
+              </div>
             </template>
           </div>
           <form class="row" style="flex-wrap:nowrap" @submit.prevent="addBrand(g.id, $event)"><label class="sr-only" :for="'b' + g.id">Add brand</label><input :id="'b' + g.id" name="name" class="input" placeholder="Add a brand"><button class="btn dark" type="submit">Add</button></form>
         </div>
       </template>
-      <p class="muted" style="margin:0">These names scroll in the two crossing ribbons on the homepage.</p>
     </section>
   </div>
 </main>

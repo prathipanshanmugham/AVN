@@ -2,6 +2,7 @@
 (function () {
   const ICONS = {
     crm: '<path d="M3 5 H21 L14 13 V19 L10 21 V13 Z"/>',
+    quotes: '<path d="M6 3 H15 L19 7 V21 H6 Z"/><path d="M15 3 V7 H19"/><path d="M9 10.5 H15 M9 13.5 H15 M11 10.5 C13.6 10.5 13.6 13.5 11 13.5 L14 17.5"/>',
     projects: '<path d="M4 6 H20 L22 16 H2 Z"/><path d="M9 6 L8 16 M15 6 L16 16 M3 11 H21"/><path d="M12 16 V20 M8 20 H16"/>',
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 H21 M8 3 V7 M16 3 V7"/>',
     clients: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20 C2.5 16.4 5.4 14 9 14 C12.6 14 15.5 16.4 15.5 20"/><path d="M16 4.5 A3.5 3.5 0 0 1 16 11.5 M18 14.5 C20.2 15.2 21.5 17.2 21.5 20"/>',
@@ -11,6 +12,7 @@
   };
   const NAV = [
     { key: 'crm', label: 'CRM', perm: 'crm' },
+    { key: 'quotes', label: 'Quotations', perm: 'quotes' },
     { key: 'projects', label: 'Projects', perm: 'projects' },
     { key: 'calendar', label: 'Calendar', perm: 'calendar' },
     { key: 'clients', label: 'Clients', perm: 'clients' },
@@ -81,6 +83,10 @@
     async logout() {
       try { await api('POST', '/auth/logout'); } catch (e) { /* ignore */ }
       location.href = '/admin/login';
+    },
+    inr(n) {
+      if (n === null || n === undefined || n === '') return '—';
+      return '₹' + Math.round(Number(n)).toLocaleString('en-IN');
     },
     money(l) {
       if (l === null || l === undefined || l === '') return '—';

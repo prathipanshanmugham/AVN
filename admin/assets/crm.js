@@ -4,7 +4,7 @@ document.addEventListener('alpine:init', () => {
     stages: [], leads: [], team: [], q: '', type: 'All', showLost: false,
     types: ['All', 'Home', 'Business', 'Industry', 'Farm'],
     sources: ['Website', 'Phone', 'WhatsApp', 'Referral', 'Walk-in', 'Google Ads', 'Meta ads'],
-    sel: null, activity: [], note: '', creating: false, form: {}, error: '',
+    sel: null, activity: [], quotes: [], note: '', creating: false, form: {}, error: '',
 
     async init() {
       await AVN.ready;
@@ -58,8 +58,25 @@ document.addEventListener('alpine:init', () => {
     async open(l) {
       this.sel = Object.assign({}, l);
       this.activity = [];
+      this.quotes = [];
       const r = await AVN.get('/leads/' + l.id);
       this.activity = r.activity;
+      this.quotes = r.quotes || [];
+    },
+    // A quotation pre-filled from this lead (name, mobile, place, size, type).
+    async quote() {
+      const size = parseFloat(String(this.sel.size || '').replace(/[^\d.]/g, ''));
+      let kwp = size > 0 ? size : null;
+      if (!kwp) {
+        const answer = prompt('System size for the quotation (kWp)?', '3');
+        if (answer === null) return;
+        kwp = parseFloat(answer);
+      }
+      try {
+        await AVN.patch('/leads/' + this.sel.id, this.payload(this.sel));
+        const q = await AVN.post('/quotes', { leadId: this.sel.id, kwp });
+        location.href = '/admin/quotes?id=' + q.id;
+      } catch (e) { AVN.toast(e.message, true); }
     },
     close() { this.sel = null; },
     payload(o) {

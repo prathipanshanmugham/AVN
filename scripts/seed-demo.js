@@ -30,11 +30,24 @@ const projects = [
   ['Green Valley Farms', 'Sathyamangalam', '10 HP pump', 'Solar pump', 4.2, 2, day(-1)],
 ];
 const insProj = db.prepare('INSERT INTO projects (name, place, kwp, type, value_lakh, stage, target_date, pm_id) VALUES (?,?,?,?,?,?,?,?)');
-projects.forEach((p) => {
+const projectIds = projects.map((p) => {
   const id = insProj.run(...p, owner).lastInsertRowid;
   createProjectTasks(id);
   db.prepare('UPDATE project_tasks SET done = 1 WHERE project_id = ? AND stage < ?').run(id, p[5]);
+  return id;
 });
+
+// A filled-in project record and serial register on the home project (sample values).
+const home = projectIds[1];
+db.prepare('UPDATE projects SET drive_link = ?, details = ? WHERE id = ?').run(
+  'https://drive.google.com/drive/folders/sample-folder',
+  JSON.stringify({ eb_number: '04-123-456-789', eb_name: 'Karthikeyan P', phase: 'Single phase', sanctioned_load: '4', roof_type: 'RCC roof',
+    psg_app_no: 'SAMPLE-2026-000123', psg_reg_date: day(-30), feasibility_date: day(-21), module_make: 'Sample Solar', module_model: 'SS-540M',
+    module_wp: '540', module_count: '10', inverter_make: 'Sample Inverters', inverter_model: 'SI-5K', inverter_kw: '5', order_value: '310000', received: '155000' }),
+  home);
+const insAsset = db.prepare('INSERT INTO project_assets (project_id, kind, make, model, serial, created_by) VALUES (?,?,?,?,?,?)');
+for (let i = 1; i <= 10; i++) insAsset.run(home, 'Module', 'Sample Solar', 'SS-540M', 'SSM2026' + String(4400 + i), owner);
+insAsset.run(home, 'Inverter', 'Sample Inverters', 'SI-5K', 'SI5K26A0091', owner);
 
 const insEv = db.prepare('INSERT INTO events (title, type, date, time, who) VALUES (?,?,?,?,?)');
 [

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /* End-to-end API smoke test against a throwaway database.  npm test */
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 const os = require('os');
 const path = require('path');
 const sharp = require('sharp');
@@ -33,7 +34,42 @@ class Client {
   async csrfToken() { const r = await this.req('GET', '/api/csrf'); this.csrf = r.data.csrf; }
 }
 
+/** A tiny SMTP server that keeps every message, to check lead emails end to end. */
+function fakeSmtp() {
+  const mails = [];
+  const server = net.createServer((sock) => {
+    sock.setEncoding('utf8');
+    let buf = '';
+    let inData = false;
+    let cur = '';
+    sock.write('220 test ESMTP\r\n');
+    sock.on('data', (chunk) => {
+      buf += chunk;
+      let i;
+      while ((i = buf.indexOf('\r\n')) >= 0) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        if (inData) {
+          if (line === '.') { inData = false; mails.push(cur); cur = ''; sock.write('250 OK queued\r\n'); } else cur += line + '\n';
+          continue;
+        }
+        const cmd = line.slice(0, 4).toUpperCase();
+        if (cmd === 'EHLO') sock.write('250-test\r\n250 AUTH PLAIN\r\n');
+        else if (cmd === 'AUTH') sock.write('235 Authenticated\r\n');
+        else if (cmd === 'DATA') { inData = true; sock.write('354 Go ahead\r\n'); }
+        else if (cmd === 'QUIT') { sock.write('221 Bye\r\n'); sock.end(); }
+        else sock.write('250 OK\r\n');
+      }
+    });
+    sock.on('error', () => {});
+  });
+  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, mails, port: server.address().port })));
+}
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+async function until(fn, ms = 4000) { for (let t = 0; t < ms; t += 100) { if (fn()) return true; await wait(100); } return fn(); }
+
 async function main() {
+  const smtp = await fakeSmtp();
   const server = spawn(process.execPath, ['server/index.js'], {
     cwd: path.join(__dirname, '..'),
     env: Object.assign({}, process.env, { PORT: String(PORT), DATA_DIR: path.join(tmp, 'data'), UPLOAD_DIR: path.join(tmp, 'uploads'), ADMIN_PASSWORD: ADMIN_PW, NODE_ENV: 'test' }),
@@ -162,6 +198,112 @@ async function main() {
     r = await anon.req('GET', '/api/public/site');
     ok(r.data.company.phone === '9876543210' && r.data.stats.length === 1, 'settings show on the public site');
 
+    console.log('Lead emails');
+    r = await admin.req('PUT', '/api/settings', { lead_emails: 'sales@avnsolar.in, owner@example.com', smtp_host: '127.0.0.1', smtp_port: String(smtp.port), smtp_user: 'leads@avnsolar.in', smtp_pass: 'smtp-secret', smtp_secure: '0' });
+    ok(r.status === 200 && r.data.smtp_pass === '' && r.data.smtp_pass_set === true, 'SMTP settings saved, password never sent back');
+    r = await admin.req('PUT', '/api/settings', { lead_emails: 'not-an-email' });
+    ok(r.status === 400, 'bad lead email address rejected');
+    r = await staff.req('GET', '/api/settings');
+    ok(r.status === 200 && r.data.smtp_pass === '', 'staff cannot read the SMTP password');
+    r = await admin.req('POST', '/api/settings/test-email');
+    ok(r.status === 200 && r.data.to.length === 2 && smtp.mails.length === 1, 'test email sent through SMTP');
+    r = await anon.req('POST', '/api/public/leads', { form: 'wizard', name: 'Priya Natarajan', phone: '9445566778', district: 'Salem', type: 'Home', bill: '₹3,000 – 6,000', roof: 'RCC / concrete roof', kwp: 3, utm: { source: 'google', medium: 'cpc', gclid: 'abc' } });
+    ok(r.status === 201, 'quote wizard lead accepted');
+    ok(await until(() => smtp.mails.some((m) => m.includes('Priya Natarajan'))), 'lead email delivered with the lead details');
+    const mail = smtp.mails.find((m) => m.includes('Priya Natarajan')) || '';
+    ok(/To: sales@avnsolar\.in, owner@example\.com/i.test(mail) && mail.includes('wa.me/919445566778'), 'email goes to every recipient with a WhatsApp link');
+    r = await anon.req('POST', '/api/public/leads', { form: 'popup', name: 'Priya N', phone: '94455 66778' });
+    r = await admin.req('GET', '/api/leads');
+    const priya = r.data.leads.filter((l) => l.phone === '9445566778');
+    ok(priya.length === 1 && priya[0].source === 'Google Ads' && priya[0].size === '3 kWp', 'repeat enquiry merged; ad source and size recorded');
+
+    console.log('Quotations');
+    r = await admin.req('PUT', '/api/settings', { rate_ongrid: '60000', quote_module_wp: '550', quote_module_make: 'TestModules' });
+    ok(r.status === 200, 'quotation rates saved');
+    r = await admin.req('POST', '/api/quotes', { leadId: priya[0].id });
+    ok(r.status === 201 && /^AVN-Q\/\d{2}-\d{2}\/0001$/.test(r.data.number), 'quotation numbered per financial year');
+    const qt = r.data;
+    ok(qt.customerName === 'Priya Natarajan' && qt.kwp === 3 && qt.items[0].rate === 60000 && qt.subsidy === 78000, 'filled from the lead, rates and PM Surya Ghar subsidy');
+    ok(qt.bom.some((b) => b.item === 'Solar PV modules' && b.qty === '6 Nos' && b.spec.includes('TestModules')), 'scope of supply counts the panels');
+    ok(qt.total === Math.round(180000 * 1.089), 'composite GST: 70% @ 5% + 30% @ 18%');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { taxMode: 'itemised', items: [{ desc: 'Modules', qty: 1, rate: 100000, gst: 5 }, { desc: 'Installation', qty: 1, rate: 20000, gst: 18 }], discount: 0 });
+    ok(r.status === 200 && r.data.total === 128600, 'itemised GST totals');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { status: 'Sent' });
+    let lead = (await admin.req('GET', '/api/leads/' + priya[0].id)).data;
+    ok(lead.lead.stage === 2 && lead.quotes.length === 1, 'sending moves the lead to "Quotation sent"');
+    r = await admin.req('POST', '/api/quotes/' + qt.id + '/duplicate');
+    ok(r.status === 201 && r.data.number.endsWith('/0002') && r.data.status === 'Draft', 'revised copy gets the next number');
+    r = await admin.req('POST', '/api/quotes/' + r.data.id + '/refill');
+    ok(r.status === 200 && r.data.items.length === 1 && r.data.items[0].rate === 60000, 'refill rebuilds lines from rates');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { status: 'Accepted' });
+    lead = (await admin.req('GET', '/api/leads/' + priya[0].id)).data;
+    ok(lead.lead.stage === 4 && lead.lead.value === 1.29, 'accepting marks the lead won with the order value');
+    r = await admin.req('GET', '/admin/quote-print?id=' + qt.id);
+    ok(r.status === 200 && String(r.data).includes('printQuote'), 'print view opens');
+    r = await admin.req('PUT', '/api/permissions', { quotes: false });
+    r = await staff.req('GET', '/api/quotes');
+    ok(r.status === 403, 'staff blocked from quotations when not allowed');
+    await admin.req('PUT', '/api/permissions', { quotes: true });
+
+    console.log('Project records & serial numbers');
+    r = await staff.req('PATCH', '/api/projects/' + projectId, { driveLink: 'javascript:alert(1)' });
+    ok(r.status === 400, 'non-http Drive link rejected');
+    r = await staff.req('PATCH', '/api/projects/' + projectId, { driveLink: 'https://drive.google.com/drive/folders/abc123' });
+    ok(r.status === 200 && r.data.driveLink === 'https://drive.google.com/drive/folders/abc123', 'Drive folder link saved');
+    r = await staff.req('PUT', '/api/projects/' + projectId + '/details', { psg_reg_date: 'yesterday' });
+    ok(r.status === 400, 'bad date in the record rejected');
+    r = await staff.req('PUT', '/api/projects/' + projectId + '/details', { psg_app_no: 'NP-TN-123', net_meter_no: 'NM-77', subsidy_amount: '78,000', unknown_field: 'x' });
+    ok(r.status === 200 && r.data.details.psg_app_no === 'NP-TN-123' && r.data.details.subsidy_amount === '78000' && !r.data.details.unknown_field, 'MNRE / PM Surya Ghar details saved');
+    r = await staff.req('POST', '/api/projects/' + projectId + '/assets', { kind: 'Module', make: 'TestModules', serials: 'TM0001\nTM0002\n TM0003 \nTM0002' });
+    ok(r.status === 201 && r.data.added === 3, 'serial numbers added in bulk (duplicates in the paste ignored)');
+    const p2 = (await staff.req('POST', '/api/projects', { name: 'Second Site' })).data.id;
+    r = await staff.req('POST', '/api/projects/' + p2 + '/assets', { kind: 'Module', serials: ['tm0001', 'TM0009'] });
+    ok(r.status === 201 && r.data.added === 1 && r.data.skipped[0].projectName === 'Test Residence', 'a serial already on another project is flagged');
+    r = await staff.req('GET', '/api/assets/search?q=tm000');
+    ok(r.status === 200 && r.data.length === 4, 'serial search across projects');
+    r = await staff.req('GET', '/api/projects/' + projectId + '/assets.csv');
+    ok(r.status === 200 && String(r.data).includes('TM0003') && /attachment/.test(r.headers.get('content-disposition')), 'serial numbers export as CSV');
+    r = await staff.req('GET', '/api/projects/' + projectId);
+    ok(r.data.assets.length === 3 && r.data.project.details.net_meter_no === 'NM-77', 'project shows record and serials');
+
+    console.log('Website photos & brand logos');
+    const wide = await sharp({ create: { width: 2400, height: 900, channels: 3, background: '#2BA6E4' } }).jpeg().toBuffer();
+    const bf = new FormData();
+    bf.append('section', 'banner');
+    bf.append('file', new Blob([wide], { type: 'image/jpeg' }), 'band.jpg');
+    r = await admin.req('POST', '/api/media', bf, true);
+    ok(r.status === 201 && r.data.section === 'banner', 'photo band image uploaded');
+    const vf = new FormData();
+    vf.append('section', 'banner');
+    vf.append('file', new Blob(['not really a video'], { type: 'video/mp4' }), 'clip.mp4');
+    r = await admin.req('POST', '/api/media', vf, true);
+    ok(r.status === 400, 'photo band refuses videos');
+    const logo = await sharp({ create: { width: 600, height: 300, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: Buffer.from('<svg width="400" height="100"><rect width="150" height="100" fill="#1D50B5"/><rect x="250" width="150" height="100" fill="#F7931E"/></svg>'), top: 100, left: 100 }]).png().toBuffer();
+    const brands = (await admin.req('GET', '/api/brands')).data;
+    const waaree = brands.find((b) => b.name === 'Waaree');
+    const lf = new FormData();
+    lf.append('file', new Blob([logo], { type: 'image/png' }), 'waaree.png');
+    r = await admin.req('POST', '/api/brands/' + waaree.id + '/logo', lf, true);
+    ok(r.status === 200 && /\.webp$/.test(r.data.logo), 'brand logo saved as WebP');
+    const meta = await sharp(path.join(tmp, 'uploads', r.data.logo)).metadata();
+    ok(meta.width === 400 && meta.height === 100 && meta.hasAlpha, 'logo trimmed to its edges, transparency kept');
+    const sf = new FormData();
+    sf.append('grp', 'inverters');
+    sf.append('file', new Blob(['<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40"><script>alert(1)</script><rect width="120" height="40" fill="#F7931E"/></svg>'], { type: 'image/svg+xml' }), 'sungrow.svg');
+    r = await admin.req('POST', '/api/brands/logo-file', sf, true);
+    ok(r.status === 200 && r.data.name === 'Sungrow' && /\.webp$/.test(r.data.logo), 'logo file matched to its brand by name; SVG rasterised');
+    r = await anon.req('GET', '/api/public/site');
+    ok(r.data.brands.modules.find((b) => b.name === 'Waaree').logo && r.data.banner.length === 1 && r.data.company.whatsappMessage, 'logos, photo band and WhatsApp text on the public site');
+
+    console.log('Admin sign-in from the server shell');
+    const env = Object.assign({}, process.env, { DATA_DIR: path.join(tmp, 'data'), UPLOAD_DIR: path.join(tmp, 'uploads'), NODE_ENV: 'test' });
+    execFileSync(process.execPath, ['scripts/set-admin.js', 'admin@avnsolar.in', 'Shell-Set-Pass-9'], { cwd: path.join(__dirname, '..'), env, stdio: 'ignore' });
+    const shell = new Client();
+    await shell.csrfToken();
+    r = await shell.req('POST', '/api/auth/login', { username: 'ADMIN@avnsolar.in', password: 'Shell-Set-Pass-9' });
+    ok(r.status === 200 && r.data.user.role === 'admin' && r.data.user.mustChange === false, 'admin signs in with the email set by admin:set');
+
     console.log('Calendar');
     r = await staff.req('POST', '/api/events', { title: 'Site visit', type: 'visit', date: '2026-11-10', time: '11:00' });
     ok(r.status === 201, 'event added');
@@ -169,6 +311,7 @@ async function main() {
     ok(r.status === 201 && r.data.items.length === 2, 'checklist with items added');
   } finally {
     server.kill();
+    smtp.server.close();
     fs.rmSync(tmp, { recursive: true, force: true });
   }
   if (failures) { console.log('\n' + failures + ' check(s) failed\n' + log.slice(-2000)); process.exit(1); }

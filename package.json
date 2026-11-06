@@ -2,7 +2,7 @@
   "name": "avn",
   "version": "1.0.0",
   "private": true,
-  "description": "AVN Solar — public website, staff workspace (CRM, projects, calendar, clients, website editor) and customer portal",
+  "description": "AVN Solar — public website, staff workspace (CRM, quotations, projects, calendar, clients, website editor) and customer portal",
   "main": "server/index.js",
   "engines": {
     "node": ">=20"
@@ -10,6 +10,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
+    "admin:set": "node scripts/set-admin.js",
     "admin:reset": "node scripts/reset-admin.js",
     "seed:demo": "node scripts/seed-demo.js",
     "test": "node scripts/smoke-test.js"
@@ -25,6 +26,7 @@
     "express-session": "^1.19.0",
     "helmet": "^8.3.0",
     "multer": "^2.5.0",
+    "nodemailer": "^10.3.1",
     "sharp": "^0.35.5"
   }
 }

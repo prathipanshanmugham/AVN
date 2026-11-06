@@ -88,6 +88,15 @@
             <button class="btn sm" type="button" x-show="sel.stage < 4" @click="setStage(sel.stage + 1)" x-text="'Move to ' + stages[sel.stage + 1]"></button>
             <button class="btn sm primary" type="button" x-show="sel.stage === 4 && !sel.projectId && $store.app.perms.projects" @click="convert()">Create project</button>
             <a class="btn sm" x-show="sel.projectId" href="/admin/projects">Open project</a>
+            <button class="btn sm" type="button" x-show="$store.app.perms.quotes && sel.stage !== 5" @click="quote()">Create quotation</button>
+          </div>
+          <div class="card tight stack" style="gap:6px" x-show="quotes.length">
+            <div class="eyebrow" style="color:var(--muted)">Quotations</div>
+            <template x-for="qt in quotes" :key="qt.id">
+              <a class="rowline" style="min-height:36px;text-decoration:none;color:inherit" :href="'/admin/quotes?id=' + qt.id">
+                <b x-text="qt.number"></b><span class="row" style="gap:8px"><span x-text="AVN.inr(qt.total)"></span><span class="badge" :class="{ Accepted: 'green', Sent: 'amber', Rejected: 'red' }[qt.status] || ''" x-text="qt.status"></span></span>
+              </a>
+            </template>
           </div>
           <form class="stack" @submit.prevent="save()">
             <div class="grid" style="--min:170px">

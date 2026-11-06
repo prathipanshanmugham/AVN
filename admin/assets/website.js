@@ -1,10 +1,11 @@
 document.addEventListener('alpine:init', () => {
   Alpine.data('website', () => ({
     sections: [
-      { id: 'hero', name: 'Hero video', desc: 'Plays behind the homepage headline. The first visible video is used.' },
+      { id: 'hero', name: 'Hero — video & photos', desc: 'Behind the homepage headline. A visible video plays; with no visible video, the photos crossfade as a slideshow.' },
       { id: 'gallery', name: 'Project gallery', desc: 'Photos and videos of finished sites.' },
       { id: 'solutions', name: 'Solution images', desc: 'Optional photos for Homes, Business, Industry, Farms (in that order).' },
-      { id: 'brands', name: 'Brand ribbons', desc: 'Panel and inverter brands.' },
+      { id: 'banner', name: 'Photo band', desc: 'Wide photos for the full-width “Your roof could be next” band. Several photos crossfade.' },
+      { id: 'brands', name: 'Brand logos', desc: 'Panel and inverter logos in the two ribbons.' },
     ],
     brandGroups: [{ id: 'modules', name: 'Panel brands' }, { id: 'inverters', name: 'Inverter brands' }],
     sec: 'hero', items: [], brands: [], ffmpeg: false, selId: null, hot: false, uploading: false, poll: null,
@@ -22,7 +23,7 @@ document.addEventListener('alpine:init', () => {
     },
     async loadBrands() { this.brands = await AVN.get('/brands'); },
     count(id) {
-      if (id === 'brands') return this.brands.length + ' names';
+      if (id === 'brands') return this.brands.filter((b) => b.logo).length + ' / ' + this.brands.length + ' logos';
       return this.items.filter((m) => m.section === id).length + ' files';
     },
     get sectionItems() { return this.items.filter((m) => m.section === this.sec); },
@@ -63,13 +64,50 @@ document.addEventListener('alpine:init', () => {
       if (!confirm('Delete "' + this.cur.title + '" from the website?')) return;
       try { await AVN.del('/media/' + this.cur.id); this.selId = null; await this.load(); AVN.toast('Deleted'); } catch (e) { AVN.toast(e.message, true); }
     },
+    get mediaSections() { return this.sections.filter((s) => s.id !== 'brands'); },
+    brandsIn(grp) { return this.brands.filter((b) => b.grp === grp); },
     async addBrand(grp, ev) {
       const input = ev.target.elements.name;
       if (!input.value.trim()) return;
       try { this.brands.push(await AVN.post('/brands', { grp, name: input.value })); input.value = ''; } catch (e) { AVN.toast(e.message, true); }
     },
     async removeBrand(b) {
+      if (!confirm('Remove ' + b.name + ' from the ribbon?')) return;
       try { await AVN.del('/brands/' + b.id); this.brands = this.brands.filter((x) => x.id !== b.id); } catch (e) { AVN.toast(e.message, true); }
+    },
+    async renameBrand(b, name) {
+      if (!name.trim() || name === b.name) return;
+      try { Object.assign(b, await AVN.patch('/brands/' + b.id, { name })); AVN.toast('Renamed'); } catch (e) { AVN.toast(e.message, true); }
+    },
+    async moveBrand(b, dir) {
+      try { await AVN.post('/brands/' + b.id + '/move', { dir }); await this.loadBrands(); } catch (e) { AVN.toast(e.message, true); }
+    },
+    async uploadLogo(b, file) {
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('file', file);
+      b.busy = true;
+      try { Object.assign(b, await AVN.post('/brands/' + b.id + '/logo', fd)); AVN.toast(b.name + ' logo saved'); } catch (e) { AVN.toast(e.message, true); }
+      b.busy = false;
+    },
+    async removeLogo(b) {
+      try { Object.assign(b, await AVN.del('/brands/' + b.id + '/logo')); } catch (e) { AVN.toast(e.message, true); }
+    },
+    // Several files at once: the file name picks the brand ("waaree.png" → Waaree), new names are added.
+    async bulkLogos(grp, files) {
+      if (!files || !files.length) return;
+      this.uploading = true;
+      let added = 0;
+      let updated = 0;
+      for (const f of files) {
+        const fd = new FormData();
+        fd.append('grp', grp);
+        fd.append('file', f);
+        try { const r = await AVN.post('/brands/logo-file', fd); if (r.created) added++; else updated++; } catch (e) { AVN.toast(f.name + ': ' + e.message, true); }
+      }
+      this.uploading = false;
+      await this.loadBrands();
+      AVN.toast([updated ? updated + ' logo(s) updated' : '', added ? added + ' brand(s) added' : ''].filter(Boolean).join(', ') || 'No logos saved');
     },
   }));
 });

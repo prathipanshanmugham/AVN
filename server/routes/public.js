@@ -2,7 +2,8 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { db, getSettings, STAGES_PROJECT } = require('../db');
 const { csrfGuard, ensureCsrf, allowMustChange, requireClient, signIn } = require('../auth');
-const { h, str, bad, HttpError, phone, checkPassword, hashPassword } = require('../util');
+const { h, str, num, line, email, bad, HttpError, phone, checkPassword, hashPassword } = require('../util');
+const { notifyLead } = require('../mailer');
 
 const router = express.Router();
 
@@ -10,42 +11,101 @@ const router = express.Router();
 router.get('/public/site', (req, res) => {
   const s = getSettings();
   const brands = { modules: [], inverters: [] };
-  db.prepare('SELECT grp, name FROM brands ORDER BY grp, position, id').all().forEach((b) => brands[b.grp].push(b.name));
+  db.prepare('SELECT grp, name, logo_name FROM brands ORDER BY grp, position, id').all()
+    .forEach((b) => brands[b.grp].push({ name: b.name, logo: b.logo_name ? '/media/' + b.logo_name : null }));
   const media = db.prepare("SELECT * FROM media WHERE visible = 1 AND status = 'ready' ORDER BY section, position, id").all();
   const pub = (m) => ({ kind: m.kind, title: m.title, alt: m.alt || m.title, src: '/media/' + m.stored_name, poster: m.poster_name ? '/media/' + m.poster_name : null });
   const heroVideo = media.find((m) => m.section === 'hero' && m.kind === 'video');
-  const heroImage = media.find((m) => m.section === 'hero' && m.kind === 'image');
+  const heroImages = media.filter((m) => m.section === 'hero' && m.kind === 'image').map(pub);
   res.set('Cache-Control', 'public, max-age=60');
   res.json({
-    company: { name: s.company_name, brand: s.brand_name, phone: s.phone, whatsapp: s.whatsapp || s.phone, email: s.email, address: s.address, hours: s.hours, gstin: s.gstin },
+    company: {
+      name: s.company_name, brand: s.brand_name, phone: s.phone, whatsapp: s.whatsapp || s.phone, whatsappMessage: s.whatsapp_message,
+      email: s.email, address: s.address, hours: s.hours, gstin: s.gstin,
+    },
     calc: { yield: Number(s.calc_yield), roof: Number(s.calc_roof), tariffHome: Number(s.calc_tariff_home), tariffBiz: Number(s.calc_tariff_biz) },
+    popup: { enabled: s.popup_enabled === '1', delay: Number(s.popup_delay) || 25, title: s.popup_title },
     videoFastOnly: s.video_fast_only === '1',
     stats: [1, 2, 3].map((i) => ({ value: s['stat' + i + '_value'], label: s['stat' + i + '_label'] })).filter((x) => x.value),
     brands,
-    hero: heroVideo ? { video: '/media/' + heroVideo.stored_name, poster: heroVideo.poster_name ? '/media/' + heroVideo.poster_name : (heroImage ? '/media/' + heroImage.stored_name : null) }
-      : (heroImage ? { video: null, poster: '/media/' + heroImage.stored_name } : null),
+    hero: {
+      video: heroVideo ? '/media/' + heroVideo.stored_name : null,
+      poster: heroVideo && heroVideo.poster_name ? '/media/' + heroVideo.poster_name : (heroImages[0] ? heroImages[0].src : null),
+      images: heroImages,
+    },
     gallery: media.filter((m) => m.section === 'gallery').map(pub),
     solutions: media.filter((m) => m.section === 'solutions').map(pub),
+    banner: media.filter((m) => m.section === 'banner' && m.kind === 'image').map(pub),
   });
 });
 
-// Website enquiry form → CRM lead
-const leadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please call us instead.' } });
+// Website enquiry forms (quote wizard, popup, calculator, contact) → CRM lead + email
+const leadLimiter = rateLimit({ windowMs: 10 * 60 * 1000, limit: 6, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Please call us instead.' } });
+
+const FORMS = { wizard: 'Quote wizard', popup: 'Website popup', calculator: 'Savings calculator', contact: 'Contact form' };
+
+function leadSource(utm) {
+  const src = (utm.source + ' ' + utm.medium).toLowerCase();
+  if (utm.gclid || (/google/.test(src) && /cpc|ppc|paid|ads/.test(src))) return 'Google Ads';
+  if (utm.fbclid || /facebook|instagram|meta|\bfb\b|\big\b/.test(src)) return 'Meta ads';
+  return 'Website';
+}
+
+function baseUrl(req) {
+  const host = String(req.get('host') || '');
+  return /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? req.protocol + '://' + host : '';
+}
 
 router.post('/public/leads', leadLimiter, (req, res) => {
   if (str(req.body.website)) return res.status(201).json({ ok: true }); // honeypot
-  const name = str(req.body.name, 120);
+  const name = line(req.body.name, 120);
   const ph = phone(req.body.phone);
-  const district = str(req.body.district, 80);
+  const district = line(req.body.district, 80);
   const type = ['Home', 'Business', 'Industry', 'Farm'].includes(req.body.type) ? req.body.type : 'Home';
   if (!name) throw bad('Please enter your name');
   if (!ph) throw bad('Please enter a valid 10-digit mobile number');
-  const units = str(req.body.units, 20);
-  const msg = units ? 'From website. Units on last EB bill: ' + units : 'From website enquiry form';
-  const info = db.prepare(`INSERT INTO leads (name, phone, place, type, source, next_action, due_date, message) VALUES (?,?,?,?, 'Website', 'Call back', date('now'), ?)`)
-    .run(name, ph, district || null, type, msg);
-  db.prepare('INSERT INTO lead_activity (lead_id, text) VALUES (?, ?)').run(info.lastInsertRowid, 'Enquiry received from the website');
+  const mail = req.body.email ? email(req.body.email) : null;
+  if (req.body.email && !mail) throw bad('Please check your email address');
+
+  const form = FORMS[req.body.form] ? req.body.form : 'contact';
+  const kwpNum = num(req.body.kwp, null);
+  const kwp = kwpNum && kwpNum > 0 && kwpNum < 100000 ? Math.round(kwpNum * 10) / 10 : null;
+  const u = req.body.utm && typeof req.body.utm === 'object' ? req.body.utm : {};
+  const utm = {};
+  ['source', 'medium', 'campaign', 'term', 'content', 'gclid', 'fbclid'].forEach((k) => { utm[k] = line(u[k], 120); });
+  const campaign = [utm.source, utm.medium, utm.campaign].filter(Boolean).join(' / ');
+  const details = [
+    ['Form', FORMS[form]],
+    ['EB bill (2 months)', line(req.body.bill, 40)],
+    ['Units on last EB bill', line(req.body.units, 20)],
+    ['Roof / site', line(req.body.roof, 40)],
+    ['Estimated savings', line(req.body.savings, 40)],
+    ['Note', str(req.body.note, 500)],
+    ['Campaign', campaign],
+    ['Page', line(req.body.page, 160)],
+  ].filter((d) => d[1]);
+  const message = details.map((d) => d[0] + ': ' + d[1]).join('\n');
+  const size = kwp ? kwp + ' kWp' : null;
+  const source = leadSource(utm);
+
+  // Same mobile within a day (e.g. popup, then the wizard): update that lead instead of creating a duplicate.
+  const recent = db.prepare("SELECT * FROM leads WHERE phone = ? AND created_at >= datetime('now', '-1 day') ORDER BY id DESC LIMIT 1").get(ph);
+  let leadId;
+  if (recent) {
+    leadId = recent.id;
+    db.prepare(`UPDATE leads SET place = COALESCE(place, ?), email = COALESCE(email, ?), size = COALESCE(?, size), due_date = date('now'),
+      message = substr(COALESCE(message || char(10) || char(10), '') || ?, 1, 2000), updated_at = datetime('now') WHERE id = ?`)
+      .run(district || null, mail, size, message, leadId);
+    db.prepare('INSERT INTO lead_activity (lead_id, text) VALUES (?, ?)').run(leadId, 'Enquired again on the website (' + FORMS[form] + ')');
+  } else {
+    leadId = db.prepare(`INSERT INTO leads (name, phone, email, place, type, size, source, next_action, due_date, message)
+      VALUES (?,?,?,?,?,?,?, 'Call back', date('now'), ?)`).run(name, ph, mail, district || null, type, size, source, message).lastInsertRowid;
+    db.prepare('INSERT INTO lead_activity (lead_id, text) VALUES (?, ?)').run(leadId, 'Enquiry received from the website (' + FORMS[form] + ')');
+  }
   res.status(201).json({ ok: true });
+
+  const lead = { name, phone: ph, email: mail, place: district, type, size, details };
+  setImmediate(() => notifyLead(lead, { baseUrl: baseUrl(req), repeat: !!recent }).catch(() => {}));
 });
 
 // --- Client portal ---

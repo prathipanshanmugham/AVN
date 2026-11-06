@@ -1,11 +1,21 @@
 /* AVN Solar public website */
 (function () {
   const ICON = (p) => '<svg viewBox="0 0 48 48" aria-hidden="true">' + p + '</svg>';
+  const IC = {
+    home: ICON('<path d="M6 23 L24 8 L42 23"/><path d="M10 20 V40 H38 V20"/><path d="M20 40 V30 H28 V40"/><path d="M28 6 L36 9 L34 15 L26 12 Z"/>'),
+    biz: ICON('<path d="M9 18 H39 V40 H9 Z"/><path d="M6 18 L10 8 H38 L42 18"/><path d="M14 40 V28 H22 V40"/><path d="M27 26 H34 V33 H27 Z"/>'),
+    ind: ICON('<path d="M6 40 V22 L16 28 V22 L26 28 V22 L36 28 V10 H42 V40 Z"/><path d="M12 34 H16 M22 34 H26 M32 34 H36"/>'),
+    farm: ICON('<path d="M24 6 C30 14 33 19 33 23 A9 9 0 0 1 15 23 C15 19 18 14 24 6 Z"/><path d="M6 42 C14 36 34 36 42 42"/><path d="M10 37 V31 M38 37 V31"/>'),
+    rcc: ICON('<path d="M6 20 H42 V40 H6 Z"/><path d="M6 20 L10 14 H38 L42 20"/><path d="M12 13 L18 7 H36 L32 13" /><path d="M14 40 V30 H22 V40"/>'),
+    sheet: ICON('<path d="M6 40 V22 L24 10 L42 22 V40 Z"/><path d="M12 18 L12 40 M18 14 V40 M24 10 V40 M30 14 V40 M36 18 V40"/>'),
+    land: ICON('<path d="M4 40 C14 34 34 34 44 40"/><path d="M8 32 L20 26 L22 30 L10 36 Z M26 30 L38 24 L40 28 L28 34 Z"/><circle cx="36" cy="10" r="4"/>'),
+    unsure: ICON('<circle cx="24" cy="24" r="17"/><path d="M19 19 A5 5 0 1 1 26 24 C24.5 25 24 26 24 28"/><path d="M24 33 V34"/>'),
+  };
   const SOLUTIONS = [
-    { title: 'Homes', text: 'Rooftop solar with subsidy and net-metering done for you.', icon: ICON('<path d="M6 23 L24 8 L42 23"/><path d="M10 20 V40 H38 V20"/><path d="M20 40 V30 H28 V40"/><path d="M28 6 L36 9 L34 15 L26 12 Z"/>') },
-    { title: 'Business', text: 'Cut daytime tariff for shops, schools and hospitals.', icon: ICON('<path d="M9 18 H39 V40 H9 Z"/><path d="M6 18 L10 8 H38 L42 18"/><path d="M14 40 V28 H22 V40"/><path d="M27 26 H34 V33 H27 Z"/>') },
-    { title: 'Industry', text: 'Rooftop and ground-mount plants for mills and factories.', icon: ICON('<path d="M6 40 V22 L16 28 V22 L26 28 V22 L36 28 V10 H42 V40 Z"/><path d="M12 34 H16 M22 34 H26 M32 34 H36"/>') },
-    { title: 'Farms', text: 'Solar pumps and off-grid power that replace diesel.', icon: ICON('<path d="M24 6 C30 14 33 19 33 23 A9 9 0 0 1 15 23 C15 19 18 14 24 6 Z"/><path d="M6 42 C14 36 34 36 42 42"/><path d="M10 37 V31 M38 37 V31"/>') },
+    { title: 'Homes', text: 'Rooftop solar with subsidy and net-metering done for you.', icon: IC.home },
+    { title: 'Business', text: 'Cut daytime tariff for shops, schools and hospitals.', icon: IC.biz },
+    { title: 'Industry', text: 'Rooftop and ground-mount plants for mills and factories.', icon: IC.ind },
+    { title: 'Farms', text: 'Solar pumps and off-grid power that replace diesel.', icon: IC.farm },
   ];
   const STEPS = [
     { t: 'Site survey', d: 'Roof measurement, shadow analysis and a look at your EB bills.' },
@@ -21,24 +31,109 @@
     { q: 'How does the subsidy reach me?', a: 'For eligible homes, the PM Surya Ghar central subsidy — up to ₹78,000 — is paid to your bank account after installation, inspection and net-metering.' },
     { q: 'What maintenance does solar need?', a: 'Regular panel cleaning plus periodic inverter, wiring and earthing checks. Our care plans cover all of it.' },
   ];
+  const WIZ_TYPES = [
+    { v: 'Home', t: 'My home', icon: IC.home },
+    { v: 'Business', t: 'Shop / office', icon: IC.biz },
+    { v: 'Industry', t: 'Factory', icon: IC.ind },
+    { v: 'Farm', t: 'Farm / pump', icon: IC.farm },
+  ];
+  const BILLS = [
+    { t: 'Under ₹1,500', v: 1000 },
+    { t: '₹1,500 – 3,000', v: 2250 },
+    { t: '₹3,000 – 6,000', v: 4500 },
+    { t: '₹6,000 – 15,000', v: 10000 },
+    { t: '₹15,000 – 50,000', v: 30000 },
+    { t: 'Above ₹50,000', v: 80000 },
+  ];
+  const ROOFS = [
+    { v: 'RCC / concrete roof', t: 'Concrete roof', icon: IC.rcc },
+    { v: 'Metal sheet roof', t: 'Sheet roof', icon: IC.sheet },
+    { v: 'Open land', t: 'Open land', icon: IC.land },
+    { v: 'Not sure', t: 'Not sure', icon: IC.unsure },
+  ];
+  const HERO_WORDS = ['savings.', 'lower EB bills.', 'clean power.', 'energy freedom.'];
 
   const reducedMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+  const store = {
+    get(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+    sget(k) { try { return window.sessionStorage.getItem(k); } catch (e) { return null; } },
+    sset(k, v) { try { window.sessionStorage.setItem(k, v); } catch (e) { /* private mode */ } },
+  };
+
+  // Ad / campaign tags, kept for the visit so the CRM knows where the lead came from.
+  function readUtm() {
+    let utm = {};
+    try { utm = JSON.parse(store.sget('avn-utm') || '{}') || {}; } catch (e) { utm = {}; }
+    try {
+      const p = new URLSearchParams(location.search);
+      const fresh = {};
+      ['source', 'medium', 'campaign', 'term', 'content'].forEach((k) => { if (p.get('utm_' + k)) fresh[k] = p.get('utm_' + k).slice(0, 120); });
+      ['gclid', 'fbclid'].forEach((k) => { if (p.get(k)) fresh[k] = p.get(k).slice(0, 120); });
+      if (Object.keys(fresh).length) { utm = fresh; store.sset('avn-utm', JSON.stringify(utm)); }
+    } catch (e) { /* ignore */ }
+    return utm;
+  }
+
+  function confetti(anchor) {
+    if (reducedMotion() || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    const box = document.createElement('div');
+    box.className = 'confetti';
+    box.style.left = (r.left + r.width / 2) + 'px';
+    box.style.top = (r.top + Math.min(r.height / 2, 160)) + 'px';
+    const colors = ['#FFC12E', '#F7931E', '#2BA6E4', '#1D50B5', '#1E8E5A', '#ffffff'];
+    for (let i = 0; i < 36; i++) {
+      const s = document.createElement('i');
+      const a = Math.random() * Math.PI * 2;
+      const d = 90 + Math.random() * 170;
+      s.style.setProperty('--x', Math.round(Math.cos(a) * d) + 'px');
+      s.style.setProperty('--y', Math.round(Math.sin(a) * d - 80) + 'px');
+      s.style.setProperty('--r', Math.round(Math.random() * 720 - 360) + 'deg');
+      s.style.background = colors[i % colors.length];
+      s.style.animationDelay = Math.round(Math.random() * 120) + 'ms';
+      if (i % 3 === 0) s.style.borderRadius = '50%';
+      box.appendChild(s);
+    }
+    document.body.appendChild(box);
+    setTimeout(() => box.remove(), 1800);
+  }
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('site', () => ({
       lang: 'en', now: Date.now(), step: 0, pinned: false, faq: 0,
       calcType: 'home', units: 600, motion: !reducedMotion(),
       company: {}, calc: { yield: 4, roof: 90, tariffHome: 6, tariffBiz: 9 }, brands: { modules: [], inverters: [] },
-      gallery: [], solutionPhotos: [], stats: [], videoFastOnly: true,
-      videoReady: false, lightbox: null,
-      form: { name: '', phone: '', district: '', type: 'Home', website: '', units: '' }, sending: false, sent: false, formError: '',
-      steps: STEPS, faqs: FAQS,
+      gallery: [], solutionPhotos: [], stats: [], banner: [], heroSlides: [], videoFastOnly: true,
+      popup: { enabled: false, delay: 25, title: '' },
+      videoReady: false, lightbox: null, slide: 0, bandSlide: 0, wi: 0, scrolled: false,
+      steps: STEPS, faqs: FAQS, WIZ_TYPES, BILLS, ROOFS, heroWords: HERO_WORDS,
+      utm: {}, sending: false, leadSent: false,
+      wiz: { step: 0, type: '', bill: '', billValue: 0, roof: '', name: '', phone: '', district: '', website: '' }, wizError: '', wizFlash: false,
+      calcForm: { name: '', phone: '' }, calcError: '', calcSent: false,
+      pop: { name: '', phone: '' }, popOpen: false, popSent: false, popError: '', waBubble: false,
 
       init() {
+        this.utm = readUtm();
         this.timer = setInterval(() => {
           this.now = Date.now();
           if (!this.pinned && this.motion) this.step = (this.step + 1) % 6;
         }, 4000);
+        if (this.motion) {
+          setInterval(() => { this.wi = (this.wi + 1) % HERO_WORDS.length; }, 2800);
+          setInterval(() => {
+            if (this.heroSlides.length > 1) this.slide = (this.slide + 1) % this.heroSlides.length;
+            if (this.banner.length > 1) this.bandSlide = (this.bandSlide + 1) % this.banner.length;
+          }, 6000);
+        }
+        const onScroll = () => { this.scrolled = window.scrollY > 520; };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        onScroll();
+        // Arriving at the quote form from any "free quote" button gives it a little flash.
+        document.addEventListener('click', (e) => {
+          const a = e.target.closest && e.target.closest('a[href="#contact"]');
+          if (a) { this.wizFlash = false; setTimeout(() => { this.wizFlash = true; }, 450); setTimeout(() => { this.wizFlash = false; }, 2200); }
+        });
         fetch('/api/public/site').then((r) => r.json()).then((d) => {
           this.company = d.company || {};
           if (d.calc) this.calc = d.calc;
@@ -46,10 +141,20 @@
           this.gallery = d.gallery || [];
           this.solutionPhotos = d.solutions || [];
           this.stats = d.stats || [];
+          this.banner = d.banner || [];
+          this.popup = d.popup || this.popup;
           this.videoFastOnly = d.videoFastOnly !== false;
+          this.heroSlides = this.heroHasVideo ? [] : ((d.hero && d.hero.images) || []);
           this.scheduleVideo();
+          this.setupPopup();
+          if (this.company.whatsapp && this.motion) {
+            setTimeout(() => { if (!this.popOpen) this.waBubble = true; }, 9000);
+            setTimeout(() => { this.waBubble = false; }, 21000);
+          }
         }).catch(() => this.scheduleVideo());
       },
+
+      get heroHasVideo() { return !!(this.$refs.hero && this.$refs.hero.dataset.video); },
 
       // Hero video: start only after the page has loaded; never on data-saver / 2G / reduced motion.
       scheduleVideo() {
@@ -89,6 +194,7 @@
       loop(arr) { return (arr || []).concat(arr || []); },
       digits(s) { return String(s || '').replace(/\D/g, '').slice(-10); },
       fmt(n) { return Math.round(n).toLocaleString('en-IN'); },
+      waLink(text) { return 'https://wa.me/91' + this.digits(this.company.whatsapp) + (text ? '?text=' + encodeURIComponent(text) : ''); },
 
       // Process arc
       pos(i) {
@@ -97,28 +203,118 @@
       },
       get arcD() { const p = this.pos(this.step); return 'M 6 88 A 44 76 0 0 1 ' + p.x + ' ' + p.y; },
 
+      // Solution cards tilt toward the pointer
+      tilt(e) {
+        if (!this.motion || e.pointerType === 'touch') return;
+        const el = e.currentTarget;
+        const r = el.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width;
+        const y = (e.clientY - r.top) / r.height;
+        el.style.setProperty('--ry', ((x - 0.5) * 12).toFixed(2) + 'deg');
+        el.style.setProperty('--rx', ((0.5 - y) * 10).toFixed(2) + 'deg');
+        el.style.setProperty('--gx', (x * 100).toFixed(1) + '%');
+        el.style.setProperty('--gy', (y * 100).toFixed(1) + '%');
+      },
+      untilt(e) { ['--rx', '--ry'].forEach((p) => e.currentTarget.style.setProperty(p, '0deg')); },
+
       // Calculator
       get tariff() { return this.calcType === 'home' ? this.calc.tariffHome : this.calc.tariffBiz; },
-      get kwp() { return Math.max(1, Math.round((this.units / 60 / this.calc.yield) * 2) / 2); },
-      get kwpLabel() { return this.kwp % 1 ? this.kwp.toFixed(1) : String(this.kwp); },
+      kwpFor(units) { return Math.max(1, Math.round((units / 60 / this.calc.yield) * 2) / 2); },
+      kwLabel(k) { return k % 1 ? k.toFixed(1) : String(k); },
+      get kwp() { return this.kwpFor(this.units); },
+      get kwpLabel() { return this.kwLabel(this.kwp); },
       get gen() { return this.kwp * this.calc.yield * 365; },
       get bill() { return this.units * 6 * this.tariff; },
       get savings() { return Math.min(this.gen, this.units * 6) * this.tariff; },
       get after() { return Math.max(0, this.bill - this.savings); },
       get afterPct() { return this.bill > 0 ? ((this.after / this.bill) * 100).toFixed(1) : 0; },
       get subsidy() { return this.kwp <= 2 ? 30000 * this.kwp : 60000 + 18000 * Math.min(1, this.kwp - 2); },
+      get calcWaText() {
+        return 'Hi ' + (this.company.brand || 'AVN Solar') + ', my EB bill is about ' + this.fmt(this.units) + ' units per 2 months. Your calculator suggests about ' +
+          this.kwpLabel + ' kWp. Please send me a quote.';
+      },
 
-      async submitLead() {
-        this.formError = '';
-        if (!this.form.name.trim()) { this.formError = 'Please enter your name'; return; }
-        if (!/^[6-9]\d{9}$/.test(this.digits(this.form.phone))) { this.formError = 'Please enter a valid 10-digit mobile number'; return; }
+      // Quote wizard
+      get wizTariff() { return this.wiz.type === 'Home' ? this.calc.tariffHome : this.calc.tariffBiz; },
+      get wizUnits() { return this.wiz.billValue ? this.wiz.billValue / this.wizTariff : 0; },
+      get wizKwp() { return this.wizUnits ? this.kwpFor(this.wizUnits) : 0; },
+      get wizSavings() { return this.wizKwp ? Math.min(this.wizKwp * this.calc.yield * 365, this.wizUnits * 6) * this.wizTariff : 0; },
+      next() { this.waBubble = false; setTimeout(() => { this.wiz.step = Math.min(3, this.wiz.step + 1); }, this.motion ? 260 : 0); },
+
+      validate(name, phone) {
+        if (!String(name || '').trim()) return 'Please enter your name';
+        if (!/^[6-9]\d{9}$/.test(this.digits(phone))) return 'Please enter a valid 10-digit mobile number';
+        return '';
+      },
+      async sendLead(payload) {
+        const res = await fetch('/api/public/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({ utm: this.utm, page: location.pathname }, payload)),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || 'Could not send. Please call us.');
+        this.leadSent = true;
+        store.set('avn-popup', String(Date.now()));
+      },
+      async sendWizard() {
+        this.wizError = this.validate(this.wiz.name, this.wiz.phone);
+        if (this.wizError) return;
         this.sending = true;
         try {
-          const res = await fetch('/api/public/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.form) });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(data.error || 'Could not send. Please call us.');
-          this.sent = true;
-        } catch (e) { this.formError = e.message; }
+          await this.sendLead({
+            form: 'wizard', name: this.wiz.name, phone: this.wiz.phone, district: this.wiz.district, type: this.wiz.type || 'Home',
+            bill: this.wiz.bill, roof: this.wiz.roof, kwp: this.wizKwp || '', savings: this.wizKwp ? '₹' + this.fmt(this.wizSavings) + ' / year' : '',
+            units: this.wizUnits ? String(Math.round(this.wizUnits)) : '', website: this.wiz.website,
+          });
+          this.wiz.step = 4;
+          this.$nextTick(() => confetti(this.$refs.wiz));
+        } catch (e) { this.wizError = e.message; }
+        this.sending = false;
+      },
+      async sendCalc() {
+        this.calcError = this.validate(this.calcForm.name, this.calcForm.phone);
+        if (this.calcError) return;
+        this.sending = true;
+        try {
+          await this.sendLead({
+            form: 'calculator', name: this.calcForm.name, phone: this.calcForm.phone, type: this.calcType === 'home' ? 'Home' : 'Business',
+            units: String(this.units), kwp: this.kwp, savings: '₹' + this.fmt(this.savings) + ' / year',
+          });
+          this.calcSent = true;
+          this.$nextTick(() => confetti(this.$refs.calcCta));
+        } catch (e) { this.calcError = e.message; }
+        this.sending = false;
+      },
+
+      // Offer popup: once a week per visitor, after a delay or on exit intent; never after a lead is sent.
+      setupPopup() {
+        if (!this.popup.enabled) return;
+        const last = Number(store.get('avn-popup') || 0);
+        if (Date.now() - last < 7 * 86400000) return;
+        const show = () => {
+          if (this.popOpen || this.leadSent || this.wiz.step > 0 || this.lightbox) return;
+          this.popOpen = true;
+          this.waBubble = false;
+          store.set('avn-popup', String(Date.now()));
+          this.$nextTick(() => { const i = this.$refs.popName; if (i) i.focus(); });
+          document.removeEventListener('mouseout', exit);
+        };
+        const exit = (e) => { if (!e.relatedTarget && e.clientY < 10) show(); };
+        setTimeout(show, Math.max(3, this.popup.delay) * 1000);
+        setTimeout(() => document.addEventListener('mouseout', exit), 8000);
+      },
+      closePop() { this.popOpen = false; },
+      async sendPop() {
+        this.popError = this.validate(this.pop.name, this.pop.phone);
+        if (this.popError) return;
+        this.sending = true;
+        try {
+          await this.sendLead({ form: 'popup', name: this.pop.name, phone: this.pop.phone });
+          this.popSent = true;
+          this.$nextTick(() => confetti(this.$refs.pop));
+          setTimeout(() => { this.popOpen = false; }, 4200);
+        } catch (e) { this.popError = e.message; }
         this.sending = false;
       },
     }));

@@ -64,22 +64,47 @@
         </div>
       </template>
 
-      <!-- Company / Website forms -->
-      <template x-if="sec === 'company' || sec === 'site'">
+      <!-- Company / Website / Lead emails / Quotations forms -->
+      <template x-if="FORM_SECTIONS.includes(sec)">
         <form class="stack" @submit.prevent="saveSettings()">
-          <div><h2 class="h2" x-text="sec === 'company' ? 'Company & contact' : 'Website & calculator'"></h2>
-            <div class="muted" x-text="sec === 'company' ? 'Shown on the website footer, contact buttons and the client portal.' : 'Search engine text, analytics, video loading and the savings calculator.'"></div></div>
+          <div><h2 class="h2" x-text="current.name"></h2><div class="muted" x-text="current.desc"></div></div>
+
+          <template x-if="sec === 'leads'">
+            <div class="stack">
+              <div class="card tight small" style="background:#E6F2FC;border-color:#E6F2FC">
+                <b>Every website enquiry is saved in the CRM.</b> Add an email server here to also get each one by email, with Call and WhatsApp buttons.<br>
+                <b>Gmail:</b> smtp.gmail.com · port 465 · SSL on · your Gmail address · an <i>App password</i> (Google Account → Security → 2-Step Verification → App passwords).<br>
+                <b>Hostinger email:</b> smtp.hostinger.com · port 465 · SSL on · the full mailbox address and its password.
+              </div>
+              <div :class="cfg.mail_status && cfg.mail_status.ok ? 'ok' : 'error'" x-show="cfg.mail_status" x-text="cfg.mail_status && ((cfg.mail_status.ok ? 'Last email: ' : 'Last email failed: ') + cfg.mail_status.message + ' · ' + AVN.when(cfg.mail_status.at.replace('T', ' ').slice(0, 19)))"></div>
+            </div>
+          </template>
+          <template x-if="sec === 'quotes' && !hasRates">
+            <div class="card tight small" style="background:#FFF4C2;border-color:#FFE59A"><b>Add your ₹ per kWp rates</b> so new quotations fill in prices automatically. Rates are before GST. Staff can still change any price on a quotation.</div>
+          </template>
+
           <div class="grid" style="--min:240px">
             <template x-for="f in fieldsFor(sec)" :key="f.k">
-              <label class="field" :style="f.wide ? 'grid-column:1/-1' : ''"><span x-text="f.label"></span> <small x-text="f.hint"></small>
-                <template x-if="f.area"><textarea class="textarea" x-model="cfg[f.k]"></textarea></template>
-                <template x-if="!f.area"><input class="input" :type="f.type || 'text'" :step="f.type === 'number' ? 'any' : null" x-model="cfg[f.k]" :placeholder="f.ph || ''"></template>
-              </label>
+              <div :style="f.wide ? 'grid-column:1/-1' : ''">
+                <template x-if="f.type === 'switch'">
+                  <div class="rowline" style="min-height:44px"><span><b x-text="f.label"></b><br><span class="small muted" x-text="f.hint"></span></span>
+                    <button type="button" class="switch" role="switch" :aria-checked="(cfg[f.k] === '1').toString()" :aria-label="f.label" @click="cfg[f.k] = cfg[f.k] === '1' ? '0' : '1'"></button></div>
+                </template>
+                <template x-if="f.type !== 'switch'">
+                  <label class="field"><span x-text="f.label"></span> <small x-text="f.k === 'smtp_pass' && cfg.smtp_pass_set ? 'saved — leave blank to keep it' : f.hint"></small>
+                    <template x-if="f.type === 'area'"><textarea class="textarea" :rows="f.rows || 3" x-model="cfg[f.k]"></textarea></template>
+                    <template x-if="f.type === 'select'"><select class="select" x-model="cfg[f.k]"><template x-for="o in f.options" :key="o[0]"><option :value="o[0]" x-text="o[1]" :selected="cfg[f.k] === o[0]"></option></template></select></template>
+                    <template x-if="!['area', 'select'].includes(f.type)"><input class="input" :type="f.type || 'text'" :step="f.type === 'number' ? 'any' : null" x-model="cfg[f.k]" :placeholder="f.k === 'smtp_pass' && cfg.smtp_pass_set ? '••••••••' : (f.ph || '')" :autocomplete="f.type === 'password' ? 'new-password' : 'off'"></template>
+                  </label>
+                </template>
+              </div>
             </template>
           </div>
-          <div class="rowline" x-show="sec === 'site'"><span><b>Play hero video only on fast connections</b><br><span class="small muted">Visitors on data-saver or 2G see the still image instead</span></span>
-            <button type="button" class="switch" role="switch" :aria-checked="(cfg.video_fast_only === '1').toString()" aria-label="Play hero video only on fast connections" @click="cfg.video_fast_only = cfg.video_fast_only === '1' ? '0' : '1'"></button></div>
-          <div><button class="btn dark" type="submit">Save changes</button></div>
+          <div class="row">
+            <button class="btn dark" type="submit">Save changes</button>
+            <button class="btn" type="button" x-show="sec === 'leads'" :disabled="testing" @click="testEmail()" x-text="testing ? 'Sending…' : 'Send test email'"></button>
+            <a class="btn" x-show="sec === 'quotes'" href="/admin/quotes">Open quotations</a>
+          </div>
         </form>
       </template>
 

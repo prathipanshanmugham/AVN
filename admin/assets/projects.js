@@ -5,9 +5,20 @@ document.addEventListener('alpine:init', () => {
     projectTypes: ['Home rooftop', 'Commercial rooftop', 'Industrial rooftop', 'Ground-mount', 'Solar pump', 'Off-grid / hybrid', 'Care & AMC'],
     cur: null, view: null, newTask: '', docTitle: '', docVisible: true, uploading: false,
     formOpen: false, form: {}, error: '',
+    fields: [], assetKinds: [], group: 'site', det: {}, detDirty: false, savingDet: false,
+    af: { kind: 'Module', make: '', model: '', serials: '' }, addingAssets: false, allAssets: false, serialHits: [], searchTimer: null,
 
     async init() {
       await AVN.ready;
+      this.$watch('q', (v) => {
+        clearTimeout(this.searchTimer);
+        const term = v.trim();
+        if (term.length < 4) { this.serialHits = []; return; }
+        this.searchTimer = setTimeout(async () => {
+          try { this.serialHits = await AVN.get('/assets/search?q=' + encodeURIComponent(term)); } catch (e) { this.serialHits = []; }
+        }, 300);
+      });
+      window.addEventListener('beforeunload', (e) => { if (this.detDirty) { e.preventDefault(); e.returnValue = ''; } });
       await this.load();
       this.team = await AVN.get('/team');
       if (Alpine.store('app').perms.clients) this.clients = await AVN.get('/clients');
@@ -18,6 +29,67 @@ document.addEventListener('alpine:init', () => {
       const r = await AVN.get('/projects');
       this.stages = r.stages;
       this.projects = r.projects;
+      this.assetKinds = r.assetKinds || [];
+      this.fields = (r.fields || []).map((g) => ({
+        id: g.id, name: g.name,
+        fields: g.fields.map(([key, label, type, options]) => ({ key, label, type: type || 'text', options: options || [] })),
+      }));
+    },
+    // Project record
+    get groupFields() { const g = this.fields.find((x) => x.id === this.group); return g ? g.fields : []; },
+    filled(g) { return g.fields.filter((f) => this.det[f.key]).length; },
+    get filledTotal() { return this.fields.reduce((a, g) => a + this.filled(g), 0); },
+    get fieldTotal() { return this.fields.reduce((a, g) => a + g.fields.length, 0); },
+    switchGroup(id) {
+      if (this.detDirty && !confirm('You have unsaved changes in this section. Switch anyway?')) return;
+      if (this.detDirty) { this.det = Object.assign({}, this.cur.project.details); this.detDirty = false; }
+      this.group = id;
+    },
+    async saveDetails() {
+      const body = {};
+      this.groupFields.forEach((f) => { body[f.key] = this.det[f.key] == null ? '' : String(this.det[f.key]); });
+      this.savingDet = true;
+      try {
+        const r = await AVN.put('/projects/' + this.cur.project.id + '/details', body);
+        this.cur.project.details = r.details;
+        this.det = Object.assign({}, r.details);
+        this.detDirty = false;
+        AVN.toast('Details saved');
+      } catch (e) { AVN.toast(e.message, true); }
+      this.savingDet = false;
+    },
+    // Serial numbers
+    get serialList() { return [...new Set(String(this.af.serials || '').split(/[\r\n,;\t]+/).map((x) => x.trim().replace(/\s+/g, '')).filter(Boolean))]; },
+    get serialCount() { return this.serialList.length; },
+    get shownAssets() { return this.allAssets ? this.cur.assets : this.cur.assets.slice(0, 12); },
+    get assetSummary() {
+      const c = {};
+      (this.cur ? this.cur.assets : []).forEach((a) => { c[a.kind] = (c[a.kind] || 0) + 1; });
+      return Object.entries(c);
+    },
+    prefillMake() {
+      const d = (this.cur && this.cur.project.details) || {};
+      const map = { Module: ['module_make', 'module_model'], Inverter: ['inverter_make', 'inverter_model'] }[this.af.kind];
+      this.af.make = map ? d[map[0]] || '' : '';
+      this.af.model = map ? d[map[1]] || '' : '';
+    },
+    async addAssets() {
+      if (!this.serialCount) return;
+      this.addingAssets = true;
+      try {
+        const r = await AVN.post('/projects/' + this.cur.project.id + '/assets', { kind: this.af.kind, make: this.af.make, model: this.af.model, serials: this.serialList });
+        this.af.serials = '';
+        this.cur = await AVN.get('/projects/' + this.cur.project.id);
+        if (r.skipped.length) {
+          const where = r.skipped.slice(0, 3).map((x) => x.serial + (x.projectId === this.cur.project.id ? ' (already here)' : ' (on ' + x.projectName + ')')).join(', ');
+          AVN.toast('Added ' + r.added + '. Skipped ' + r.skipped.length + ' already recorded: ' + where + (r.skipped.length > 3 ? '…' : ''), true);
+        } else AVN.toast('Added ' + r.added + ' serial number' + (r.added === 1 ? '' : 's'));
+      } catch (e) { AVN.toast(e.message, true); }
+      this.addingAssets = false;
+    },
+    async removeAsset(a) {
+      if (!confirm('Remove serial ' + a.serial + '?')) return;
+      try { await AVN.del('/assets/' + a.id); this.cur.assets = this.cur.assets.filter((x) => x.id !== a.id); } catch (e) { AVN.toast(e.message, true); }
     },
     get list() {
       const q = this.q.trim().toLowerCase();
@@ -40,8 +112,14 @@ document.addEventListener('alpine:init', () => {
     get stageTasks() { return this.cur ? this.cur.tasks.filter((t) => t.stage === this.viewStage) : []; },
     get stageDone() { return this.stageTasks.filter((t) => t.done).length; },
     async select(id) {
+      if (this.detDirty && this.cur && this.cur.project.id !== id && !confirm('Discard unsaved project details?')) return;
       this.cur = await AVN.get('/projects/' + id);
       this.view = null;
+      this.det = Object.assign({}, this.cur.project.details);
+      this.detDirty = false;
+      this.allAssets = false;
+      this.af = { kind: 'Module', make: '', model: '', serials: '' };
+      this.prefillMake();
     },
     async refresh() {
       await this.load();
@@ -100,11 +178,12 @@ document.addEventListener('alpine:init', () => {
         AVN.toast('Project deleted');
       } catch (e) { AVN.toast(e.message, true); }
     },
-    openForm(p) {
+    openForm(p, focusDrive) {
       this.error = '';
-      this.form = p ? { id: p.id, name: p.name, place: p.place, kwp: p.kwp, type: p.type || 'Home rooftop', value: p.value ?? '', pmId: p.pmId || '', targetDate: p.targetDate, clientId: p.clientId || '' }
-        : { name: '', place: '', kwp: '', type: 'Home rooftop', value: '', pmId: '', targetDate: '', clientId: '' };
+      this.form = p ? { id: p.id, name: p.name, place: p.place, kwp: p.kwp, type: p.type || 'Home rooftop', value: p.value ?? '', pmId: p.pmId || '', targetDate: p.targetDate, clientId: p.clientId || '', driveLink: p.driveLink || '' }
+        : { name: '', place: '', kwp: '', type: 'Home rooftop', value: '', pmId: '', targetDate: '', clientId: '', driveLink: '' };
       this.formOpen = true;
+      if (focusDrive) this.$nextTick(() => this.$refs.drive && this.$refs.drive.focus());
     },
     async saveForm() {
       this.error = '';

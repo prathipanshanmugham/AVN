@@ -46,7 +46,8 @@ router.get('/leads/:id', (req, res) => {
   if (!l) throw notFound();
   const activity = db.prepare(`SELECT a.id, a.text, a.created_at AS createdAt, u.name AS userName
     FROM lead_activity a LEFT JOIN users u ON u.id = a.user_id WHERE a.lead_id = ? ORDER BY a.id DESC LIMIT 50`).all(l.id);
-  res.json({ lead: leadOut(l), activity });
+  const quotes = db.prepare('SELECT id, number, status, total FROM quotes WHERE lead_id = ? ORDER BY id DESC').all(l.id);
+  res.json({ lead: leadOut(l), activity, quotes });
 });
 
 router.post('/leads', (req, res) => {
@@ -104,6 +105,7 @@ router.post('/leads/:id/convert', h((req, res) => {
     projectId = info.lastInsertRowid;
     createProjectTasks(projectId);
     db.prepare("UPDATE leads SET stage = 4, project_id = ?, updated_at = datetime('now') WHERE id = ?").run(projectId, l.id);
+    db.prepare('UPDATE quotes SET project_id = ? WHERE lead_id = ? AND project_id IS NULL').run(projectId, l.id);
     db.prepare('INSERT INTO lead_activity (lead_id, user_id, text) VALUES (?,?,?)').run(l.id, req.user.id, 'Won — project created');
   })();
   res.status(201).json({ projectId });

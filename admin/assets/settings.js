@@ -8,11 +8,16 @@ document.addEventListener('alpine:init', () => {
       { k: 'whatsapp', label: 'WhatsApp number', hint: 'blank = same as phone' },
       { k: 'email', label: 'Sales email', type: 'email' },
       { k: 'hours', label: 'Working hours' },
-      { k: 'address', label: 'Office address', area: true, wide: true },
+      { k: 'address', label: 'Office address', type: 'area', wide: true },
     ],
     site: [
       { k: 'site_title', label: 'Site title', hint: 'shown in Google results', wide: true },
-      { k: 'site_description', label: 'Site description', hint: 'about 150 characters', area: true, wide: true },
+      { k: 'site_description', label: 'Site description', hint: 'about 150 characters', type: 'area', wide: true },
+      { k: 'whatsapp_message', label: 'WhatsApp button message', hint: 'pre-filled when a visitor taps WhatsApp', type: 'area', rows: 2, wide: true },
+      { k: 'popup_enabled', label: 'Offer popup', hint: 'Shown once a week per visitor, after a delay or when they move to leave', type: 'switch', wide: true },
+      { k: 'popup_title', label: 'Popup headline' },
+      { k: 'popup_delay', label: 'Show popup after (seconds)', type: 'number' },
+      { k: 'video_fast_only', label: 'Play hero video only on fast connections', hint: 'Visitors on data-saver or 2G see the still image instead', type: 'switch', wide: true },
       { k: 'ga_id', label: 'Google Analytics ID', ph: 'G-XXXXXXXXXX' },
       { k: 'stat1_value', label: 'Homepage number 1', hint: 'e.g. 12 MW — blank hides it', ph: '12 MW' },
       { k: 'stat1_label', label: 'Number 1 label' },
@@ -25,22 +30,53 @@ document.addEventListener('alpine:init', () => {
       { k: 'calc_tariff_home', label: 'Home tariff (₹ / unit)', type: 'number' },
       { k: 'calc_tariff_biz', label: 'Business tariff (₹ / unit)', type: 'number' },
     ],
+    leads: [
+      { k: 'lead_emails', label: 'Send new leads to', hint: 'one or more emails, separated by commas', type: 'text', ph: 'sales@avnsolar.in, owner@gmail.com', wide: true },
+      { k: 'smtp_host', label: 'SMTP server', ph: 'smtp.gmail.com' },
+      { k: 'smtp_port', label: 'Port', type: 'number', ph: '465' },
+      { k: 'smtp_user', label: 'SMTP username', hint: 'usually the full email address', ph: 'leads@avnsolar.in' },
+      { k: 'smtp_pass', label: 'SMTP password', type: 'password' },
+      { k: 'smtp_from', label: 'Send as', hint: 'blank = SMTP username', ph: 'AVN Solar <leads@avnsolar.in>' },
+      { k: 'smtp_secure', label: 'Use SSL / TLS', hint: 'On for port 465. Off for 587 (STARTTLS is used automatically).', type: 'switch' },
+    ],
+    quotes: [
+      { k: 'rate_ongrid', label: 'On-grid rate (₹ per kWp)', hint: 'before GST', type: 'number', ph: '55000' },
+      { k: 'rate_hybrid', label: 'Hybrid rate (₹ per kWp)', hint: 'before GST', type: 'number' },
+      { k: 'rate_offgrid', label: 'Off-grid rate (₹ per kWp)', hint: 'before GST', type: 'number' },
+      { k: 'quote_tax_mode', label: 'GST on new quotations', type: 'select', options: [['composite', 'Solar EPC: 70% @ 5% + 30% @ 18% (≈ 8.9%)'], ['itemised', 'GST rate on each line']] },
+      { k: 'quote_prefix', label: 'Number prefix', hint: 'gives AVN-Q/26-27/0001' },
+      { k: 'quote_validity', label: 'Valid for (days)', type: 'number' },
+      { k: 'quote_module_wp', label: 'Module rating (Wp)', hint: 'used to count panels', type: 'number' },
+      { k: 'quote_module_make', label: 'Module make', ph: 'e.g. your usual brand' },
+      { k: 'quote_inverter_make', label: 'Inverter make' },
+      { k: 'quote_terms', label: 'Terms & conditions', hint: 'one per line — printed on every quotation', type: 'area', rows: 6, wide: true },
+      { k: 'bank_name', label: 'Bank name' },
+      { k: 'bank_account', label: 'Account number' },
+      { k: 'bank_ifsc', label: 'IFSC' },
+      { k: 'bank_branch', label: 'Branch' },
+      { k: 'upi_id', label: 'UPI ID', ph: 'avnsolar@bank' },
+    ],
   };
+  const FORM_SECTIONS = ['company', 'site', 'leads', 'quotes'];
 
   Alpine.data('settings', () => ({
     sections: [
       { id: 'users', name: 'Users', admin: true },
       { id: 'permissions', name: 'Permissions', admin: true },
-      { id: 'company', name: 'Company & contact', admin: true },
-      { id: 'site', name: 'Website & calculator', admin: true },
+      { id: 'company', name: 'Company & contact', admin: true, desc: 'Shown on the website footer, contact buttons, quotations and the client portal.' },
+      { id: 'site', name: 'Website & lead capture', admin: true, desc: 'Search engine text, WhatsApp button, offer popup, video loading and the savings calculator.' },
+      { id: 'leads', name: 'Lead emails', admin: true, desc: 'Get every website enquiry in your inbox the moment it arrives.' },
+      { id: 'quotes', name: 'Quotations & bank', admin: true, desc: 'Rates, GST, terms and bank details used by the quotation generator.' },
       { id: 'account', name: 'My account', admin: false },
     ],
+    FORM_SECTIONS, testing: false,
     modules: [
       { id: 'crm', name: 'CRM', desc: 'Leads, pipeline, website enquiries' },
       { id: 'projects', name: 'Projects', desc: 'Stages, checklists, documents' },
       { id: 'calendar', name: 'Calendar', desc: 'Events, deadlines, checklists' },
       { id: 'clients', name: 'Clients', desc: 'Create client portal logins, service requests' },
-      { id: 'website', name: 'Website editor', desc: 'Hero video, gallery, brand ribbons' },
+      { id: 'quotes', name: 'Quotations', desc: 'Create, print and share quotations' },
+      { id: 'website', name: 'Website editor', desc: 'Hero video and photos, gallery, brand logos' },
     ],
     sec: 'users', isAdmin: false, users: [], perms: {}, cfg: {},
     modal: null, uform: {}, error: '', secret: {},
@@ -51,8 +87,12 @@ document.addEventListener('alpine:init', () => {
       if (!this.isAdmin) { this.sec = 'account'; return; }
       const [users, perms, cfg] = await Promise.all([AVN.get('/users'), AVN.get('/permissions'), AVN.get('/settings')]);
       this.users = users; this.perms = perms; this.cfg = cfg;
+      const want = new URLSearchParams(location.search).get('sec');
+      if (want && this.sections.some((s) => s.id === want)) this.sec = want;
     },
     get visibleSections() { return this.sections.filter((s) => this.isAdmin || !s.admin); },
+    get current() { return this.sections.find((s) => s.id === this.sec) || {}; },
+    get hasRates() { return ['rate_ongrid', 'rate_hybrid', 'rate_offgrid'].some((k) => Number(this.cfg[k]) > 0); },
     fieldsFor(sec) { return FIELDS[sec] || []; },
     async togglePerm(id) {
       try {
@@ -61,7 +101,23 @@ document.addEventListener('alpine:init', () => {
       } catch (e) { AVN.toast(e.message, true); }
     },
     async saveSettings() {
-      try { this.cfg = await AVN.put('/settings', this.cfg); AVN.toast('Settings saved'); } catch (e) { AVN.toast(e.message, true); }
+      const keys = (FIELDS[this.sec] || []).map((f) => f.k);
+      const body = {};
+      keys.forEach((k) => { body[k] = this.cfg[k]; });
+      try { this.cfg = await AVN.put('/settings', body); AVN.toast('Settings saved'); } catch (e) { AVN.toast(e.message, true); }
+    },
+    async testEmail() {
+      this.testing = true;
+      try {
+        await this.saveSettings();
+        const r = await AVN.post('/settings/test-email');
+        this.cfg.mail_status = r.status;
+        AVN.toast('Test email sent to ' + r.to.join(', '));
+      } catch (e) {
+        AVN.toast(e.message, true);
+        try { this.cfg = await AVN.get('/settings'); } catch (err) { /* ignore */ }
+      }
+      this.testing = false;
     },
     openUser(u) {
       this.error = '';

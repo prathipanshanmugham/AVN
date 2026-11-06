@@ -52,6 +52,23 @@ function phone(v) {
   return /^[6-9]\d{9}$/.test(ten) ? ten : null;
 }
 
+const EMAIL_RE = /^[^\s@<>(),;:"\\]+@[^\s@<>(),;:"\\]+\.[^\s@<>(),;:"\\]{2,}$/;
+function email(v) {
+  const s = str(v, 160);
+  return EMAIL_RE.test(s) ? s : null;
+}
+/** http(s) links only (Drive folders, maps). Returns null for anything else. */
+function url(v, max = 500) {
+  const s = str(v, max);
+  if (!s) return null;
+  try {
+    const u = new URL(s);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
+  } catch (e) { return null; }
+}
+/** One line of text: no CR/LF (used for anything that may end up in an email header). */
+const line = (v, max = 200) => str(v, max).replace(/[\r\n]+/g, ' ');
+
 class HttpError extends Error {
   constructor(status, message) {
     super(message);
@@ -72,4 +89,4 @@ const h = (fn) => (req, res, next) => {
   }
 };
 
-module.exports = { generatePassword, hashPassword, checkPassword, str, optStr, num, int, date, time, bool, phone, HttpError, bad, notFound, forbidden, h };
+module.exports = { generatePassword, hashPassword, checkPassword, str, optStr, num, int, date, time, bool, phone, email, url, line, EMAIL_RE, HttpError, bad, notFound, forbidden, h };

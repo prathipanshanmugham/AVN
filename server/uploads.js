@@ -46,6 +46,37 @@ const docUpload = multer({
   },
 });
 
+const LOGO_TYPES = IMAGE_TYPES.concat(['image/svg+xml']);
+const logoUpload = multer({
+  storage: tmpStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (LOGO_TYPES.includes(file.mimetype)) return cb(null, true);
+    cb(bad('Upload the logo as PNG, SVG, JPG or WebP'));
+  },
+});
+
+/**
+ * Brand logos: SVGs are rasterised (never served as SVG), empty borders trimmed,
+ * scaled to fit 640×160 and saved as WebP with transparency.
+ */
+async function processLogo(tmpPath, mimetype) {
+  const storedName = randomName('.webp');
+  const out = path.join(MEDIA_DIR, storedName);
+  try {
+    const input = mimetype === 'image/svg+xml' ? sharp(tmpPath, { density: 300 }) : sharp(tmpPath);
+    let buf = await input.rotate().png().toBuffer();
+    try { buf = await sharp(buf).trim({ threshold: 12 }).toBuffer(); } catch (e) { /* nothing to trim */ }
+    await sharp(buf).resize({ width: 640, height: 160, fit: 'inside', withoutEnlargement: mimetype !== 'image/svg+xml' })
+      .webp({ quality: 90, alphaQuality: 100 }).toFile(out);
+  } catch (e) {
+    throw bad('Could not read that image. Try a PNG or JPG.');
+  } finally {
+    fs.unlink(tmpPath, () => {});
+  }
+  return { storedName, size: fs.statSync(out).size };
+}
+
 let ffmpegAvailable = null;
 function hasFfmpeg() {
   if (ffmpegAvailable === null) {
@@ -104,4 +135,4 @@ function removeFile(dir, name) {
   fs.unlink(path.join(dir, name), () => {});
 }
 
-module.exports = { MEDIA_DIR, DOCS_DIR, IMAGE_TYPES, VIDEO_TYPES, mediaUpload, docUpload, processImage, processVideo, removeFile, hasFfmpeg };
+module.exports = { MEDIA_DIR, DOCS_DIR, IMAGE_TYPES, VIDEO_TYPES, mediaUpload, docUpload, logoUpload, processImage, processLogo, processVideo, removeFile, hasFfmpeg };

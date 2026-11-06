@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Quotation — AVN Solar</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/quote-print.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/quote-calc.js"></script>
+<script defer src="/admin/assets/quote-print.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div x-data="printQuote" x-cloak>
+  <div class="toolbar">
+    <a :href="q ? '/admin/quotes?id=' + q.id : '/admin/quotes'">← Back to quotation</a>
+    <span class="hint">In the print window, choose <b>Save as PDF</b> to get a PDF.</span>
+    <button type="button" @click="window.print()" :disabled="!q">Print / Save as PDF</button>
+  </div>
+  <div class="error" x-show="error" x-text="error"></div>
+
+  <template x-if="q">
+    <article class="sheet">
+      <header class="top">
+        <div class="co">
+          <img src="/assets/logo.png" alt="" width="72" height="72">
+          <div>
+            <b class="name" x-text="cfg.company_name || 'AVN Solar Solutions'"></b>
+            <div x-show="cfg.address" class="addr" x-text="cfg.address"></div>
+            <div x-text="[cfg.phone ? 'Ph: ' + cfg.phone : '', cfg.email].filter(Boolean).join(' · ')"></div>
+            <div x-show="cfg.gstin" x-text="'GSTIN: ' + cfg.gstin"></div>
+          </div>
+        </div>
+        <div class="doc">
+          <h1>Quotation</h1>
+          <table>
+            <tr><td>No.</td><td><b x-text="q.number"></b></td></tr>
+            <tr><td>Date</td><td x-text="d(q.date)"></td></tr>
+            <tr x-show="q.validUntil"><td>Valid until</td><td x-text="d(q.validUntil)"></td></tr>
+          </table>
+        </div>
+      </header>
+      <div class="band"></div>
+
+      <section class="parties">
+        <div>
+          <h2>Quotation for</h2>
+          <b x-text="q.customerName"></b>
+          <div x-show="q.customerAddress" class="addr" x-text="q.customerAddress"></div>
+          <div x-text="[q.customerPhone ? 'Ph: ' + q.customerPhone : '', q.customerEmail].filter(Boolean).join(' · ')"></div>
+          <div x-show="q.customerGstin" x-text="'GSTIN: ' + q.customerGstin"></div>
+        </div>
+        <div>
+          <h2>System</h2>
+          <b x-text="q.kwp + ' kWp ' + q.systemType + ' solar power system'"></b>
+          <div x-text="'For: ' + ({ Home: 'Home', Business: 'Business / commercial', Industry: 'Industry', Farm: 'Farm' }[q.segment] || q.segment)"></div>
+          <div x-show="q.place" x-text="'Site: ' + q.place"></div>
+        </div>
+      </section>
+
+      <table class="lines">
+        <thead>
+          <tr><th class="n">#</th><th>Description</th><th>HSN/SAC</th><th class="r">Qty</th><th>Unit</th><th class="r">Rate (₹)</th><th class="r" x-show="q.taxMode === 'itemised'">GST</th><th class="r">Amount (₹)</th></tr>
+        </thead>
+        <tbody>
+          <template x-for="(it, i) in t.items" :key="i">
+            <tr><td class="n" x-text="i + 1"></td><td class="desc" x-text="it.desc"></td><td x-text="it.hsn"></td><td class="r" x-text="num(it.qty)"></td><td x-text="it.unit"></td><td class="r" x-text="money(it.rate)"></td><td class="r" x-show="q.taxMode === 'itemised'" x-text="it.gst + '%'"></td><td class="r" x-text="money(it.amount)"></td></tr>
+          </template>
+        </tbody>
+      </table>
+
+      <section class="sum">
+        <div class="words">
+          <span>Amount in words</span>
+          <b x-text="QuoteCalc.words(t.total)"></b>
+          <p x-show="q.taxMode !== 'itemised'" class="small">GST on this solar EPC contract: 70% of the value as supply @ 5% and 30% as services @ 18%.</p>
+        </div>
+        <table class="totals">
+          <tr><td>Subtotal</td><td x-text="money(t.subtotal)"></td></tr>
+          <tr x-show="t.discount"><td>Less: discount</td><td x-text="'− ' + money(t.discount)"></td></tr>
+          <tr x-show="t.discount"><td>Taxable value</td><td x-text="money(t.taxable)"></td></tr>
+          <template x-for="l in taxRows" :key="l.label"><tr><td x-text="l.label"></td><td x-text="money(l.amount)"></td></tr></template>
+          <tr x-show="t.roundOff"><td>Round off</td><td x-text="money(t.roundOff)"></td></tr>
+          <tr class="grand"><td>Total</td><td x-text="QuoteCalc.inr(t.total)"></td></tr>
+        </table>
+      </section>
+
+      <section class="subsidy" x-show="t.subsidy">
+        <div><b>Expected PM Surya Ghar subsidy: <span x-text="QuoteCalc.inr(t.subsidy)"></span></b>
+          <p>Credited by the Government directly to your bank account after commissioning and inspection. Not deducted from this quotation.</p></div>
+        <div class="eff"><span>Your effective cost</span><b x-text="QuoteCalc.inr(t.effective)"></b></div>
+      </section>
+
+      <section x-show="q.bom.length">
+        <h3>Scope of supply</h3>
+        <table class="bom">
+          <thead><tr><th class="n">#</th><th>Item</th><th>Make / specification</th><th>Qty</th></tr></thead>
+          <tbody><template x-for="(b, i) in q.bom" :key="i"><tr><td class="n" x-text="i + 1"></td><td x-text="b.item"></td><td x-text="b.spec"></td><td x-text="b.qty"></td></tr></template></tbody>
+        </table>
+      </section>
+
+      <section x-show="q.notes" class="notes"><h3>Note</h3><p x-text="q.notes"></p></section>
+
+      <section x-show="terms.length" class="terms">
+        <h3>Terms &amp; conditions</h3>
+        <ol><template x-for="(line, i) in terms" :key="i"><li x-text="line"></li></template></ol>
+      </section>
+
+      <section class="foot">
+        <div class="bank" x-show="cfg.bank_account || cfg.upi_id">
+          <h3>Bank details</h3>
+          <table>
+            <tr x-show="cfg.bank_name"><td>Bank</td><td x-text="cfg.bank_name + (cfg.bank_branch ? ', ' + cfg.bank_branch : '')"></td></tr>
+            <tr x-show="cfg.bank_account"><td>A/c name</td><td x-text="cfg.company_name"></td></tr>
+            <tr x-show="cfg.bank_account"><td>A/c no.</td><td x-text="cfg.bank_account"></td></tr>
+            <tr x-show="cfg.bank_ifsc"><td>IFSC</td><td x-text="cfg.bank_ifsc"></td></tr>
+            <tr x-show="cfg.upi_id"><td>UPI</td><td x-text="cfg.upi_id"></td></tr>
+          </table>
+        </div>
+        <div class="sign">
+          <div class="accept"><span>Accepted by customer</span><i></i><small>Signature &amp; date</small></div>
+          <div class="auth"><span x-text="'For ' + (cfg.company_name || 'AVN Solar Solutions')"></span><i></i><small>Authorised signatory</small></div>
+        </div>
+      </section>
+      <p class="thanks" x-text="'Thank you for considering ' + (cfg.brand_name || 'AVN Solar') + '. ' + (q.createdBy ? 'Prepared by ' + q.createdBy + '.' : '')"></p>
+    </article>
+  </template>
+</div>
+</body>
+</html>

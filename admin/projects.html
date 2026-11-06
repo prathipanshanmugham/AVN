@@ -26,7 +26,13 @@
       <div class="tabs" role="group" aria-label="Show">
         <template x-for="t in tabs" :key="t[0]"><button type="button" :class="tab === t[0] && 'on'" :aria-pressed="tab === t[0]" @click="tab = t[0]" x-text="t[1]"></button></template>
       </div>
-      <label class="search" style="min-width:0"><span class="sr-only">Search projects</span><input type="search" placeholder="Search projects" x-model="q"></label>
+      <label class="search" style="min-width:0"><span class="sr-only">Search projects or serial numbers</span><input type="search" placeholder="Search projects or a serial number" x-model="q"></label>
+      <div class="card tight stack" style="gap:4px" x-show="serialHits.length">
+        <div class="eyebrow" style="color:var(--muted)">Serial number matches</div>
+        <template x-for="h in serialHits" :key="h.id">
+          <button type="button" class="rowline hit" @click="select(h.projectId)"><span><b class="mono" x-text="h.serial"></b><br><span class="small muted" x-text="[h.kind, h.make, h.model].filter(Boolean).join(' · ')"></span></span><span class="small" style="text-align:right" x-text="h.projectName"></span></button>
+        </template>
+      </div>
       <template x-for="p in list" :key="p.id">
         <button type="button" class="item" :class="cur && cur.project.id === p.id && 'on'" @click="select(p.id)">
           <span class="row between" style="flex-wrap:nowrap;align-items:baseline"><b x-text="p.name"></b><span class="small" :style="late(p) ? 'color:var(--red-fg);font-weight:700' : 'color:var(--muted)'" x-text="dueText(p)"></span></span>
@@ -49,6 +55,8 @@
                 <div class="muted" x-text="[cur.project.place, cur.project.kwp, AVN.money(cur.project.value)].filter(Boolean).join(' · ')"></div>
               </div>
               <div class="row">
+                <a class="btn sm dark" x-show="cur.project.driveLink" :href="cur.project.driveLink" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7 A2 2 0 0 1 5 5 H10 L12 7 H19 A2 2 0 0 1 21 9 V17 A2 2 0 0 1 19 19 H5 A2 2 0 0 1 3 17 Z"/></svg>Project folder</a>
+                <button class="btn sm" type="button" x-show="!cur.project.driveLink" @click="openForm(cur.project, true)">+ Drive link</button>
                 <button class="btn sm" type="button" @click="openForm(cur.project)">Edit</button>
                 <button class="btn sm danger" type="button" @click="remove()">Delete</button>
               </div>
@@ -57,6 +65,8 @@
               <span><span class="small muted">Project manager</span><br><b x-text="cur.project.pmName || '—'"></b></span>
               <span><span class="small muted">Target date</span><br><b x-text="cur.project.targetDate ? AVN.date(cur.project.targetDate) : '—'"></b></span>
               <span><span class="small muted">Client login</span><br><b x-text="cur.project.clientName ? cur.project.clientName + ' (' + cur.project.clientCode + ')' : 'Not linked'"></b></span>
+              <span x-show="cur.quotes && cur.quotes.length"><span class="small muted">Quotations</span><br>
+                <template x-for="qt in cur.quotes" :key="qt.id"><a class="small" style="font-weight:700;margin-right:8px" :href="'/admin/quotes?id=' + qt.id" x-text="qt.number + ' · ' + AVN.inr(qt.total) + ' · ' + qt.status"></a></template></span>
             </div>
             <div class="steps" style="--n:6">
               <template x-for="(s, i) in stages" :key="i">
@@ -108,6 +118,53 @@
               </template>
             </div>
           </div>
+
+          <div class="card stack" aria-label="Project record">
+            <div class="row between"><div><h3>Project record</h3><span class="small muted">EB, MNRE / PM Surya Ghar, system, warranty and payment details for this site</span></div>
+              <span class="badge" x-text="filledTotal + ' of ' + fieldTotal + ' filled'"></span></div>
+            <div class="chips" role="tablist" aria-label="Record sections">
+              <template x-for="g in fields" :key="g.id">
+                <button type="button" class="chip" role="tab" :aria-selected="(group === g.id).toString()" :class="group === g.id && 'on'" @click="switchGroup(g.id)"><span x-text="g.name"></span> <span class="small" style="opacity:.7" x-text="filled(g) + '/' + g.fields.length"></span></button>
+              </template>
+            </div>
+            <form class="grid" style="--min:210px" @submit.prevent="saveDetails()" @input="detDirty = true" @change="detDirty = true">
+              <template x-for="f in groupFields" :key="f.key">
+                <label class="field" :style="f.type === 'area' || f.type === 'url' ? 'grid-column:1/-1' : ''"><span x-text="f.label"></span>
+                  <template x-if="f.type === 'select'"><select class="select" x-model="det[f.key]"><option value="">—</option><template x-for="o in f.options" :key="o"><option :value="o" x-text="o" :selected="det[f.key] === o"></option></template></select></template>
+                  <template x-if="f.type === 'area'"><textarea class="textarea" rows="2" x-model="det[f.key]"></textarea></template>
+                  <template x-if="!['select', 'area'].includes(f.type)">
+                    <span class="row" style="flex-wrap:nowrap;gap:6px"><input class="input" :type="f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : (f.type === 'url' ? 'url' : 'text'))" :step="f.type === 'number' ? 'any' : null" x-model="det[f.key]">
+                      <a class="btn sm" x-show="f.type === 'url' && det[f.key]" :href="det[f.key]" target="_blank" rel="noopener noreferrer">Open</a></span>
+                  </template>
+                </label>
+              </template>
+              <div class="ok" style="grid-column:1/-1" x-show="group === 'finance' && det.order_value" x-text="'Balance due: ' + AVN.inr(Math.max(0, (Number(det.order_value) || 0) - (Number(det.received) || 0)))"></div>
+              <div class="row" style="grid-column:1/-1"><button class="btn dark" type="submit" :disabled="savingDet" x-text="savingDet ? 'Saving…' : 'Save details'"></button><span class="small" style="color:var(--orange);font-weight:700" x-show="detDirty">Unsaved changes</span></div>
+            </form>
+          </div>
+
+          <div class="card stack" aria-label="Serial numbers">
+            <div class="row between"><div><h3>Serial numbers</h3><span class="small muted">For warranty claims, the subsidy portal and service visits. Search any serial from the box on the left.</span></div>
+              <span class="row"><template x-for="k in assetSummary" :key="k[0]"><span class="badge" x-text="k[0] + ' · ' + k[1]"></span></template>
+                <a class="btn sm" x-show="cur.assets.length" :href="'/api/projects/' + cur.project.id + '/assets.csv'">Download CSV</a></span></div>
+            <div class="serials" x-show="cur.assets.length">
+              <template x-for="a in shownAssets" :key="a.id">
+                <div class="serial"><span><b class="mono" x-text="a.serial"></b><span class="small muted" x-text="[a.kind, a.make, a.model].filter(Boolean).join(' · ')"></span></span>
+                  <button class="btn sm danger icon" type="button" @click="removeAsset(a)" :aria-label="'Remove serial ' + a.serial">✕</button></div>
+              </template>
+            </div>
+            <button type="button" class="link" x-show="cur.assets.length > 12" @click="allAssets = !allAssets" x-text="allAssets ? 'Show fewer' : 'Show all ' + cur.assets.length"></button>
+            <div class="empty small" x-show="!cur.assets.length">No serial numbers yet. Add panel, inverter and meter serials below.</div>
+            <form class="stack" @submit.prevent="addAssets()">
+              <div class="grid" style="--min:160px">
+                <label class="field">Type<select class="select" x-model="af.kind" @change="prefillMake()"><template x-for="k in assetKinds" :key="k"><option :value="k" x-text="k"></option></template></select></label>
+                <label class="field">Make<input class="input" x-model="af.make"></label>
+                <label class="field">Model<input class="input" x-model="af.model"></label>
+              </div>
+              <label class="field">Serial numbers <small>one per line — paste from a sheet, or click here and scan each barcode</small><textarea class="textarea mono" rows="4" x-model="af.serials"></textarea></label>
+              <div class="row"><button class="btn dark" type="submit" :disabled="!serialCount || addingAssets" x-text="addingAssets ? 'Adding…' : 'Add ' + serialCount + ' serial number' + (serialCount === 1 ? '' : 's')"></button></div>
+            </form>
+          </div>
         </div>
       </template>
     </section>
@@ -125,6 +182,7 @@
         <label class="field">Value (₹ lakh)<input class="input" type="number" step="0.1" min="0" x-model="form.value"></label>
         <label class="field">Project manager<select class="select" x-model="form.pmId"><option value="">—</option><template x-for="m in team" :key="m.id"><option :value="m.id" x-text="m.name"></option></template></select></label>
         <label class="field">Target date<input class="input" type="date" x-model="form.targetDate"></label>
+        <label class="field" style="grid-column:1/-1">Google Drive folder link <small>where all files for this project are kept</small><input class="input" type="url" x-model="form.driveLink" x-ref="drive" placeholder="https://drive.google.com/drive/folders/…"></label>
         <label class="field" x-show="clients.length" style="grid-column:1/-1">Client login<select class="select" x-model="form.clientId"><option value="">Not linked</option><template x-for="c in clients" :key="c.id"><option :value="c.id" x-text="c.name + ' · ' + c.customerId"></option></template></select></label>
       </div>
       <div class="row"><button class="btn dark" type="submit">Save</button><button class="btn" type="button" @click="formOpen = false">Cancel</button></div>

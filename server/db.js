@@ -13,7 +13,7 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.pragma('busy_timeout = 5000');
 
-const MODULES = ['crm', 'projects', 'calendar', 'website', 'clients'];
+const MODULES = ['crm', 'projects', 'calendar', 'website', 'clients', 'quotes'];
 const STAGES_LEAD = ['New lead', 'Site survey', 'Quotation sent', 'Negotiation', 'Won', 'Lost'];
 const STAGES_PROJECT = ['Survey', 'Design', 'Procurement', 'Installation', 'Approvals', 'Switch-on'];
 const PROJECT_CHECKLISTS = [
@@ -45,7 +45,63 @@ const SETTING_DEFAULTS = {
   stat1_value: '', stat1_label: 'capacity commissioned',
   stat2_value: '', stat2_label: 'rooftops and plants delivered',
   stat3_value: '', stat3_label: 'districts served',
+  // Lead capture
+  whatsapp_message: 'Hi AVN Solar, I would like a free solar site survey.',
+  popup_enabled: '1',
+  popup_delay: '25',
+  popup_title: 'Free rooftop survey + subsidy check',
+  // Lead emails
+  lead_emails: '',
+  smtp_host: '', smtp_port: '587', smtp_secure: '0', smtp_user: '', smtp_pass: '', smtp_from: '',
+  mail_status: '',
+  // Quotations
+  quote_prefix: 'AVN-Q',
+  quote_validity: '15',
+  quote_tax_mode: 'composite',
+  rate_ongrid: '0', rate_hybrid: '0', rate_offgrid: '0',
+  quote_module_wp: '540', quote_module_make: '', quote_inverter_make: '',
+  quote_terms: [
+    'Payment: 50% advance with order, 40% on delivery of material, 10% after commissioning.',
+    'EB / net-meter fees, civil work and elevated structures are extra unless listed in this quotation.',
+    'PM Surya Ghar subsidy (eligible homes) is credited by the government to the customer’s bank account after commissioning and inspection. It is not deducted from this quotation.',
+    'Installation within 3–4 weeks of advance, subject to site readiness and material availability.',
+    'Panels and inverter carry the manufacturers’ warranties. Workmanship is covered by AVN as agreed.',
+  ].join('\n'),
+  bank_name: '', bank_account: '', bank_ifsc: '', bank_branch: '', upi_id: '',
 };
+
+/** Project record fields, grouped. [key, label, type?, options?] — type: text (default), date, number, url, area, select */
+const PROJECT_FIELDS = [
+  { id: 'site', name: 'Site & EB', fields: [
+    ['eb_number', 'EB service connection no.'], ['eb_name', 'Name on EB bill'], ['eb_section', 'EB section / office'],
+    ['tariff', 'Tariff category'], ['phase', 'Supply', 'select', ['Single phase', 'Three phase']],
+    ['sanctioned_load', 'Sanctioned load (kW)', 'number'],
+    ['roof_type', 'Roof / site', 'select', ['RCC roof', 'Metal sheet roof', 'Tile roof', 'Ground', 'Other']],
+    ['roof_area', 'Usable area (sq ft)', 'number'], ['map_link', 'Map location link', 'url'], ['site_address', 'Site address', 'area'],
+  ] },
+  { id: 'approvals', name: 'MNRE · PM Surya Ghar · EB', fields: [
+    ['psg_app_no', 'PM Surya Ghar application no.'], ['psg_reg_date', 'Registered on national portal', 'date'],
+    ['feasibility_date', 'EB feasibility approved', 'date'], ['vendor_selected', 'Vendor selected on portal', 'date'],
+    ['dcr_cert', 'DCR / ALMM certificate no.'], ['install_uploaded', 'Installation details uploaded', 'date'],
+    ['inspection_date', 'EB inspection done', 'date'], ['net_meter_no', 'Net meter no.'], ['net_meter_date', 'Net meter installed', 'date'],
+    ['commissioning_cert', 'Commissioning certificate no.'], ['subsidy_amount', 'Subsidy amount (₹)', 'number'],
+    ['subsidy_claimed', 'Subsidy claimed', 'date'], ['subsidy_received', 'Subsidy received', 'date'],
+  ] },
+  { id: 'system', name: 'System installed', fields: [
+    ['module_make', 'Module make'], ['module_model', 'Module model'], ['module_wp', 'Module rating (Wp)', 'number'], ['module_count', 'No. of modules', 'number'],
+    ['inverter_make', 'Inverter make'], ['inverter_model', 'Inverter model'], ['inverter_kw', 'Inverter capacity (kW)', 'number'],
+    ['structure', 'Structure type'], ['battery', 'Battery (make · kWh)'], ['monitoring', 'Monitoring app & login ID'],
+  ] },
+  { id: 'handover', name: 'Commissioning & warranty', fields: [
+    ['commissioned_on', 'Commissioned on', 'date'], ['handover_on', 'Handed over on', 'date'],
+    ['module_warranty', 'Module warranty till', 'date'], ['inverter_warranty', 'Inverter warranty till', 'date'], ['amc_till', 'AMC valid till', 'date'],
+  ] },
+  { id: 'finance', name: 'Finance', fields: [
+    ['order_value', 'Order value (₹)', 'number'], ['received', 'Total received (₹)', 'number'],
+    ['invoice_no', 'Invoice no.'], ['invoice_date', 'Invoice date', 'date'], ['loan_bank', 'Loan bank (if any)'], ['finance_notes', 'Payment notes', 'area'],
+  ] },
+];
+const ASSET_KINDS = ['Module', 'Inverter', 'Battery', 'Net meter', 'Solar meter', 'Optimiser', 'Other'];
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -212,10 +268,110 @@ CREATE INDEX IF NOT EXISTS idx_tasks_project ON project_tasks(project_id, stage)
 CREATE INDEX IF NOT EXISTS idx_media_section ON media(section, position);
 `);
 
+/*
+ * Schema upgrades. Each step runs once, in a transaction, and bumps PRAGMA user_version.
+ * Existing installs (user_version 0) and fresh databases go through the same steps.
+ */
+const MIGRATIONS = [
+  // 1 — Drive link + project record, serial register, brand logos, website photo band, quotations
+  () => {
+    const cols = (t) => db.prepare(`PRAGMA table_info(${t})`).all().map((c) => c.name);
+    if (!cols('projects').includes('drive_link')) db.exec('ALTER TABLE projects ADD COLUMN drive_link TEXT');
+    if (!cols('projects').includes('details')) db.exec("ALTER TABLE projects ADD COLUMN details TEXT NOT NULL DEFAULT '{}'");
+    if (!cols('brands').includes('logo_name')) db.exec('ALTER TABLE brands ADD COLUMN logo_name TEXT');
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project_assets (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        make TEXT,
+        model TEXT,
+        serial TEXT NOT NULL,
+        notes TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_serial ON project_assets(kind, serial COLLATE NOCASE);
+      CREATE INDEX IF NOT EXISTS idx_assets_project ON project_assets(project_id);
+
+      -- SQLite cannot change a CHECK constraint, so rebuild media to allow the new 'banner' section.
+      CREATE TABLE media_new (
+        id INTEGER PRIMARY KEY,
+        section TEXT NOT NULL CHECK (section IN ('hero','gallery','solutions','banner')),
+        kind TEXT NOT NULL CHECK (kind IN ('image','video')),
+        title TEXT NOT NULL,
+        alt TEXT,
+        stored_name TEXT NOT NULL,
+        poster_name TEXT,
+        mime TEXT,
+        size INTEGER,
+        original_size INTEGER,
+        visible INTEGER NOT NULL DEFAULT 1,
+        position INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'ready',
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO media_new (id, section, kind, title, alt, stored_name, poster_name, mime, size, original_size, visible, position, status, created_at)
+        SELECT id, section, kind, title, alt, stored_name, poster_name, mime, size, original_size, visible, position, status, created_at FROM media;
+      DROP TABLE media;
+      ALTER TABLE media_new RENAME TO media;
+      CREATE INDEX IF NOT EXISTS idx_media_section ON media(section, position);
+
+      CREATE TABLE IF NOT EXISTS quotes (
+        id INTEGER PRIMARY KEY,
+        number TEXT NOT NULL UNIQUE,
+        lead_id INTEGER REFERENCES leads(id) ON DELETE SET NULL,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        status TEXT NOT NULL DEFAULT 'Draft',
+        quote_date TEXT NOT NULL,
+        valid_until TEXT,
+        customer_name TEXT NOT NULL,
+        customer_phone TEXT,
+        customer_email TEXT,
+        customer_address TEXT,
+        customer_gstin TEXT,
+        site_place TEXT,
+        segment TEXT NOT NULL DEFAULT 'Home',
+        system_type TEXT NOT NULL DEFAULT 'On-grid',
+        kwp REAL,
+        items TEXT NOT NULL DEFAULT '[]',
+        bom TEXT NOT NULL DEFAULT '[]',
+        tax_mode TEXT NOT NULL DEFAULT 'composite',
+        interstate INTEGER NOT NULL DEFAULT 0,
+        discount REAL NOT NULL DEFAULT 0,
+        subsidy REAL NOT NULL DEFAULT 0,
+        subtotal REAL NOT NULL DEFAULT 0,
+        gst REAL NOT NULL DEFAULT 0,
+        total REAL NOT NULL DEFAULT 0,
+        notes TEXT,
+        terms TEXT,
+        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_quotes_lead ON quotes(lead_id);
+    `);
+  },
+];
+
+function migrate() {
+  let version = db.pragma('user_version', { simple: true });
+  while (version < MIGRATIONS.length) {
+    const step = version;
+    db.transaction(() => {
+      MIGRATIONS[step]();
+      db.pragma('user_version = ' + (step + 1));
+    })();
+    version = step + 1;
+    console.log('Database upgraded to version ' + version);
+  }
+}
+migrate();
+
 function seed() {
   const tx = db.transaction(() => {
     for (const m of MODULES) {
-      const allowed = m === 'website' ? 0 : 1;
+      const allowed = m === 'website' ? 0 : 1; // new modules are added for existing installs too
       db.prepare('INSERT OR IGNORE INTO permissions (module, staff_allowed) VALUES (?, ?)').run(m, allowed);
     }
     for (const [k, v] of Object.entries(SETTING_DEFAULTS)) {
@@ -281,4 +437,11 @@ function createProjectTasks(projectId) {
   PROJECT_CHECKLISTS.forEach((list, stage) => list.forEach((label, i) => ins.run(projectId, stage, label, i)));
 }
 
-module.exports = { db, MODULES, STAGES_LEAD, STAGES_PROJECT, SETTING_DEFAULTS, getSettings, getPermissions, createProjectTasks };
+function setSetting(key, value) {
+  db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, String(value));
+}
+
+module.exports = {
+  db, MODULES, STAGES_LEAD, STAGES_PROJECT, SETTING_DEFAULTS, PROJECT_FIELDS, ASSET_KINDS,
+  getSettings, setSetting, getPermissions, createProjectTasks,
+};

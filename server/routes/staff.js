@@ -1,8 +1,9 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { db, MODULES, SETTING_DEFAULTS, getSettings, getPermissions } = require('../db');
+const { db, MODULES, SETTING_DEFAULTS, getSettings, setSetting, getPermissions } = require('../db');
 const { ensureCsrf, csrfGuard, currentUser, can, requireStaff, allowMustChange, requireAdmin, signIn } = require('../auth');
-const { h, str, optStr, bool, bad, notFound, HttpError, generatePassword, hashPassword, checkPassword } = require('../util');
+const { h, str, optStr, bool, email, bad, notFound, HttpError, generatePassword, hashPassword, checkPassword } = require('../util');
+const { sendTest } = require('../mailer');
 
 const router = express.Router();
 
@@ -131,27 +132,74 @@ router.put('/permissions', requireAdmin, (req, res) => {
 });
 
 // --- Settings ---
+// The SMTP password is never sent back to the browser.
+function publicSettings() {
+  const s = getSettings();
+  const out = Object.assign({}, s, { smtp_pass: '', smtp_pass_set: !!s.smtp_pass });
+  try { out.mail_status = s.mail_status ? JSON.parse(s.mail_status) : null; } catch (e) { out.mail_status = null; }
+  return out;
+}
+
 router.get('/settings', (req, res) => {
-  res.json(getSettings());
+  res.json(publicSettings());
 });
 
+const NUMERIC = {
+  calc_yield: [0.1, 20], calc_roof: [1, 1000], calc_tariff_home: [0.1, 100], calc_tariff_biz: [0.1, 100],
+  popup_delay: [3, 600], quote_validity: [1, 365], quote_module_wp: [50, 2000], smtp_port: [1, 65535],
+  rate_ongrid: [0, 10000000], rate_hybrid: [0, 10000000], rate_offgrid: [0, 10000000],
+};
+const LABELS = {
+  calc_yield: 'units per kWp', calc_roof: 'roof area', calc_tariff_home: 'home tariff', calc_tariff_biz: 'business tariff',
+  popup_delay: 'popup delay', quote_validity: 'quotation validity', quote_module_wp: 'module rating', smtp_port: 'SMTP port',
+  rate_ongrid: 'on-grid rate', rate_hybrid: 'hybrid rate', rate_offgrid: 'off-grid rate',
+};
+const SWITCHES = ['video_fast_only', 'popup_enabled', 'smtp_secure'];
+const LONG = { site_description: 400, address: 400, quote_terms: 3000, whatsapp_message: 300 };
+const READ_ONLY = ['mail_status'];
+
 router.put('/settings', requireAdmin, (req, res) => {
-  const up = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
-  const numeric = ['calc_yield', 'calc_roof', 'calc_tariff_home', 'calc_tariff_biz'];
+  const updates = {};
   Object.keys(SETTING_DEFAULTS).forEach((k) => {
-    if (req.body[k] === undefined) return;
-    let v = str(req.body[k], k === 'site_description' || k === 'address' ? 400 : 160);
-    if (numeric.includes(k)) {
+    if (req.body[k] === undefined || READ_ONLY.includes(k)) return;
+    let v = LONG[k] ? str(req.body[k], LONG[k]) : str(req.body[k], 160).replace(/[\r\n]+/g, ' ');
+    if (NUMERIC[k]) {
       const n = Number(v);
-      if (!Number.isFinite(n) || n <= 0 || n > 1000) throw bad('Enter a valid number for ' + k.replace('calc_', '').replace('_', ' '));
+      const [min, max] = NUMERIC[k];
+      if (v === '' || !Number.isFinite(n) || n < min || n > max) throw bad('Enter a valid number for ' + LABELS[k]);
       v = String(n);
     }
-    if (k === 'video_fast_only') v = bool(req.body[k]) ? '1' : '0';
+    if (SWITCHES.includes(k)) v = bool(req.body[k]) ? '1' : '0';
     if (k === 'ga_id' && v && !/^G-[A-Z0-9]{4,16}$/i.test(v)) throw bad('Google Analytics ID looks like G-XXXXXXXXXX');
-    up.run(k, v);
+    if (k === 'quote_tax_mode' && !['composite', 'itemised'].includes(v)) throw bad('Unknown GST mode');
+    if (k === 'quote_prefix' && !/^[A-Za-z0-9-]{1,16}$/.test(v)) throw bad('Quotation prefix: up to 16 letters, numbers or dashes');
+    if (k === 'lead_emails' && v) {
+      const list = v.split(/[\s,;]+/).filter(Boolean);
+      const badOne = list.find((x) => !email(x));
+      if (badOne) throw bad('"' + badOne + '" is not a valid email address');
+      if (list.length > 10) throw bad('Up to 10 email addresses');
+      v = list.join(', ');
+    }
+    if (k === 'smtp_from' && v && !email(v) && !/^[^<>]{1,80}<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>$/.test(v)) throw bad('Sender: an email address, or Name <email@domain>');
+    if (k === 'smtp_host' && v && !/^[a-z0-9.-]+$/i.test(v)) throw bad('SMTP server looks like smtp.gmail.com');
+    if (k === 'smtp_pass' && v === '') return; // blank = keep the saved password
+    updates[k] = v;
   });
-  res.json(getSettings());
+  if (bool(req.body.smtp_pass_clear)) updates.smtp_pass = '';
+  db.transaction(() => Object.entries(updates).forEach(([k, v]) => setSetting(k, v)))();
+  res.json(publicSettings());
 });
+
+router.post('/settings/test-email', requireAdmin, h(async (req, res) => {
+  const to = req.body.to ? email(req.body.to) : null;
+  if (req.body.to && !to) throw bad('Enter a valid email address');
+  try {
+    const list = await sendTest(to);
+    res.json({ ok: true, to: list, status: publicSettings().mail_status });
+  } catch (e) {
+    throw bad('Could not send: ' + e.message);
+  }
+}));
 
 module.exports = router;
 module.exports.currentUser = currentUser;

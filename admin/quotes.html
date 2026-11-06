@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Quotations — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/quote-calc.js"></script>
+<script defer src="/admin/assets/quotes.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="quotes" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">Quotations</h1><div class="sub">Price a system in a minute — pick the size, check the lines, then print, save as PDF or share on WhatsApp.</div></div>
+    <button class="btn primary" type="button" @click="openNew()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>New quotation</button>
+  </div>
+
+  <div class="card tight small" style="background:#FFF4C2;border-color:#FFE59A" x-show="loaded && !hasRates">
+    <b>No ₹ per kWp rates yet</b>, so new quotations start with a price of ₹0.
+    <span x-show="isAdmin">Add them in <a href="/admin/settings?sec=quotes">Settings → Quotations &amp; bank</a>.</span>
+    <span x-show="!isAdmin">Ask an admin to add them in Settings, or type the price on each quotation.</span>
+  </div>
+
+  <div class="split">
+    <div class="list stack">
+      <label class="search" style="min-width:0"><span class="sr-only">Search quotations</span><input type="search" placeholder="Search name, number or place" x-model="q"></label>
+      <div class="chips" role="group" aria-label="Filter by status">
+        <template x-for="s in ['All'].concat(statuses)" :key="s"><button type="button" class="chip" :class="status === s && 'on'" :aria-pressed="status === s" @click="status = s" x-text="s"></button></template>
+      </div>
+      <template x-for="x in list" :key="x.id">
+        <button type="button" class="item" :class="cur && cur.id === x.id && 'on'" @click="select(x.id)">
+          <span class="row between" style="flex-wrap:nowrap;align-items:baseline"><b x-text="x.customerName"></b><b x-text="AVN.inr(x.total)"></b></span>
+          <span class="small muted" x-text="[x.number, (x.kwp ? x.kwp + ' kWp ' + x.systemType : ''), x.place].filter(Boolean).join(' · ')"></span>
+          <span class="row between small"><span class="muted" x-text="AVN.date(x.date)"></span><span class="badge" :class="badge(x)" x-text="statusLabel(x)"></span></span>
+        </button>
+      </template>
+      <div class="empty" x-show="loaded && !list.length">No quotations yet. Create one here, or from a lead in the CRM.</div>
+    </div>
+
+    <section class="detail stack" aria-label="Quotation">
+      <template x-if="!cur"><div class="empty">Select a quotation, or create a new one.</div></template>
+      <template x-if="cur">
+        <form class="stack" style="gap:16px" @submit.prevent="save()" @input="dirty = true" @change="dirty = true">
+          <div class="card stack">
+            <div class="row between" style="align-items:flex-start">
+              <div>
+                <div class="eyebrow" x-text="cur.number"></div>
+                <h2 class="h2" x-text="cur.customerName || 'Quotation'"></h2>
+                <div class="small muted">
+                  <span x-text="'Created ' + AVN.date(cur.date) + (cur.createdBy ? ' by ' + cur.createdBy : '')"></span>
+                  <template x-if="cur.leadId"><span> · Lead: <a href="/admin/crm" x-text="cur.leadName || 'open CRM'"></a></span></template>
+                  <template x-if="cur.projectId"><span> · Project: <a href="/admin/projects" x-text="cur.projectName"></a></span></template>
+                </div>
+              </div>
+              <div class="row">
+                <a class="btn sm dark" :href="'/admin/quote-print?id=' + cur.id" target="_blank" rel="noopener" @click="printClick($event)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9 V3 H17 V9"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14 H17 V21 H7 Z"/></svg>Print / PDF</a>
+                <a class="btn sm" x-show="waNumber" :href="waShare" target="_blank" rel="noopener">WhatsApp</a>
+                <button class="btn sm" type="button" @click="duplicate()">Revise (copy)</button>
+                <button class="btn sm danger" type="button" @click="remove()">Delete</button>
+              </div>
+            </div>
+            <div class="row" style="gap:16px;align-items:flex-end">
+              <label class="field" style="min-width:150px">Status
+                <select class="select" x-model="cur.status"><template x-for="s in statuses" :key="s"><option :value="s" x-text="s" :selected="cur.status === s"></option></template></select></label>
+              <label class="field">Date<input class="input" type="date" x-model="cur.date"></label>
+              <label class="field">Valid until<input class="input" type="date" x-model="cur.validUntil"></label>
+              <span class="badge red" x-show="expired" style="margin-bottom:12px">Expired</span>
+            </div>
+          </div>
+
+          <div class="grid" style="--min:320px">
+            <div class="card stack">
+              <h3>Customer</h3>
+              <div class="grid" style="--min:160px">
+                <label class="field">Name<input class="input" x-model="cur.customerName" required></label>
+                <label class="field">Mobile<input class="input" x-model="cur.customerPhone" inputmode="tel"></label>
+                <label class="field">Email<input class="input" type="email" x-model="cur.customerEmail"></label>
+                <label class="field">GSTIN <small>businesses</small><input class="input" x-model="cur.customerGstin"></label>
+                <label class="field" style="grid-column:1/-1">Billing address<textarea class="textarea" rows="2" x-model="cur.customerAddress"></textarea></label>
+                <label class="field" style="grid-column:1/-1">Site / place<input class="input" x-model="cur.place"></label>
+              </div>
+            </div>
+            <div class="card stack">
+              <h3>System</h3>
+              <div class="grid" style="--min:140px">
+                <label class="field">Size (kWp)<input class="input" type="number" step="0.01" min="0.1" x-model="cur.kwp" required></label>
+                <label class="field">Type<select class="select" x-model="cur.systemType"><template x-for="t in systems" :key="t"><option :value="t" x-text="t" :selected="cur.systemType === t"></option></template></select></label>
+                <label class="field">For<select class="select" x-model="cur.segment"><template x-for="t in segments" :key="t"><option :value="t" x-text="t" :selected="cur.segment === t"></option></template></select></label>
+              </div>
+              <p class="small muted" style="margin:0">Changed the size or type? Refill the price line and scope of supply from your Settings rates.</p>
+              <div><button class="btn" type="button" @click="refill()">Refill lines from rates</button></div>
+            </div>
+          </div>
+
+          <div class="card stack">
+            <div class="row between"><h3>Price</h3>
+              <label class="field" style="flex-direction:row;align-items:center;gap:10px">GST
+                <select class="select" style="width:auto" x-model="cur.taxMode"><option value="composite" :selected="cur.taxMode === 'composite'">Solar EPC: 70% @ 5% + 30% @ 18%</option><option value="itemised" :selected="cur.taxMode === 'itemised'">Rate on each line</option></select></label>
+            </div>
+            <div class="qtable" role="table" aria-label="Price lines">
+              <div class="qrow qhead" role="row" :class="cur.taxMode === 'itemised' && 'withgst'">
+                <span role="columnheader">Description</span><span role="columnheader">HSN/SAC</span><span role="columnheader">Qty</span><span role="columnheader">Unit</span><span role="columnheader">Rate (₹)</span><span role="columnheader" x-show="cur.taxMode === 'itemised'">GST</span><span role="columnheader" class="num">Amount</span><span></span>
+              </div>
+              <template x-for="(it, i) in cur.items" :key="i">
+                <div class="qrow" role="row" :class="cur.taxMode === 'itemised' && 'withgst'">
+                  <textarea class="textarea" rows="2" aria-label="Description" x-model="it.desc"></textarea>
+                  <input class="input" aria-label="HSN or SAC code" x-model="it.hsn">
+                  <input class="input" type="number" step="any" min="0" aria-label="Quantity" x-model="it.qty">
+                  <input class="input" aria-label="Unit" x-model="it.unit">
+                  <input class="input" type="number" step="any" min="0" aria-label="Rate" x-model="it.rate">
+                  <select class="select" aria-label="GST rate" x-show="cur.taxMode === 'itemised'" x-model.number="it.gst"><template x-for="g in GST_RATES" :key="g"><option :value="g" x-text="g + '%'" :selected="Number(it.gst) === g"></option></template></select>
+                  <b class="num" x-text="QuoteCalc.inr((Number(it.qty) || 0) * (Number(it.rate) || 0))"></b>
+                  <button class="btn sm danger icon" type="button" @click="cur.items.splice(i, 1); dirty = true" :aria-label="'Remove line ' + (i + 1)">✕</button>
+                </div>
+              </template>
+            </div>
+            <div class="row">
+              <button class="btn sm" type="button" @click="addLine()">+ Add line</button>
+              <template x-for="p in presets" :key="p.desc"><button class="btn sm" type="button" @click="addLine(p)" x-text="'+ ' + p.label"></button></template>
+            </div>
+
+            <div class="split" style="align-items:flex-start">
+              <div class="stack" style="flex:1 1 260px">
+                <label class="field">Discount (₹)<input class="input" type="number" step="any" min="0" x-model="cur.discount"></label>
+                <label class="check" style="padding:0"><input type="checkbox" x-model="cur.interstate"><span>Customer is outside Tamil Nadu (IGST)</span></label>
+                <label class="field">Expected subsidy (₹) <small>shown as information, not deducted</small>
+                  <span class="row" style="flex-wrap:nowrap"><input class="input" type="number" step="any" min="0" x-model="cur.subsidy"><button class="btn sm" type="button" @click="cur.subsidy = QuoteCalc.subsidyFor(cur.kwp); dirty = true" title="PM Surya Ghar central subsidy for homes">PM Surya Ghar</button></span></label>
+              </div>
+              <div class="totals" style="flex:1 1 320px">
+                <div><span>Subtotal</span><b x-text="QuoteCalc.inr(t.subtotal, true)"></b></div>
+                <div x-show="t.discount"><span>Less discount</span><b x-text="'− ' + QuoteCalc.inr(t.discount, true)"></b></div>
+                <div x-show="t.discount"><span>Taxable value</span><b x-text="QuoteCalc.inr(t.taxable, true)"></b></div>
+                <template x-for="l in taxRows" :key="l.label"><div><span x-text="l.label"></span><b x-text="QuoteCalc.inr(l.amount, true)"></b></div></template>
+                <div x-show="t.roundOff"><span>Round off</span><b x-text="QuoteCalc.inr(t.roundOff, true)"></b></div>
+                <div class="grand"><span>Total</span><b x-text="QuoteCalc.inr(t.total)"></b></div>
+                <div class="small muted" x-text="QuoteCalc.words(t.total)"></div>
+                <div class="eff" x-show="t.subsidy"><span>Effective cost after subsidy</span><b x-text="QuoteCalc.inr(t.effective)"></b></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card stack">
+            <div class="row between"><h3>Scope of supply</h3><span class="small muted">Printed under the price, without amounts</span></div>
+            <div class="qtable" role="table" aria-label="Scope of supply">
+              <div class="brow qhead" role="row"><span role="columnheader">Item</span><span role="columnheader">Make / specification</span><span role="columnheader">Qty</span><span></span></div>
+              <template x-for="(b, i) in cur.bom" :key="i">
+                <div class="brow" role="row">
+                  <input class="input" aria-label="Item" x-model="b.item">
+                  <input class="input" aria-label="Make or specification" x-model="b.spec">
+                  <input class="input" aria-label="Quantity" x-model="b.qty">
+                  <button class="btn sm danger icon" type="button" @click="cur.bom.splice(i, 1); dirty = true" :aria-label="'Remove ' + (b.item || 'row')">✕</button>
+                </div>
+              </template>
+            </div>
+            <div><button class="btn sm" type="button" @click="cur.bom.push({ item: '', spec: '', qty: '' }); dirty = true">+ Add item</button></div>
+          </div>
+
+          <div class="card stack">
+            <h3>Notes &amp; terms</h3>
+            <label class="field">Note to customer <small>optional, printed above the terms</small><textarea class="textarea" rows="2" x-model="cur.notes"></textarea></label>
+            <label class="field">Terms &amp; conditions <small>one per line</small><textarea class="textarea" rows="6" x-model="cur.terms"></textarea></label>
+          </div>
+
+          <div class="savebar" :class="dirty && 'on'">
+            <span x-text="dirty ? 'Unsaved changes' : 'All changes saved'"></span>
+            <button class="btn dark" type="submit" :disabled="saving" x-text="saving ? 'Saving…' : 'Save quotation'"></button>
+          </div>
+        </form>
+      </template>
+    </section>
+  </div>
+
+  <div class="overlay center" x-show="creating" x-transition.opacity @click.self="creating = false">
+    <form class="modal" @submit.prevent="create()">
+      <h2 class="h2">New quotation</h2>
+      <p class="muted" style="margin:0">Lines, panel count and the scope of supply fill in from the size and your Settings. You can change everything after.</p>
+      <div class="error" x-show="error" x-text="error"></div>
+      <div class="grid" style="--min:180px">
+        <label class="field" style="grid-column:1/-1">Customer name<input class="input" x-model="form.customerName" required></label>
+        <label class="field">Mobile<input class="input" x-model="form.customerPhone" inputmode="tel"></label>
+        <label class="field">Place<input class="input" x-model="form.place"></label>
+        <label class="field">Size (kWp)<input class="input" type="number" step="0.01" min="0.1" x-model="form.kwp" required></label>
+        <label class="field">Type<select class="select" x-model="form.systemType"><template x-for="t in systems" :key="t"><option :value="t" x-text="t"></option></template></select></label>
+        <label class="field">For<select class="select" x-model="form.segment"><template x-for="t in segments" :key="t"><option :value="t" x-text="t"></option></template></select></label>
+      </div>
+      <div class="row"><button class="btn dark" type="submit">Create quotation</button><button class="btn" type="button" @click="creating = false">Cancel</button></div>
+    </form>
+  </div>
+</main>
+</div>
+</body>
+</html>
