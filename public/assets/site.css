@@ -61,6 +61,7 @@ button,input,select{font:inherit;color:inherit}
 .hero-slide.on{opacity:1}
 .hero-video.ready{opacity:1}
 .hero-shade{position:absolute;inset:0;background:rgba(14,21,66,.58)}
+.hero-glow{position:absolute;inset:0;pointer-events:none;background:radial-gradient(560px circle at var(--px,72%) var(--py,28%),rgba(255,193,46,.26),rgba(255,193,46,0) 62%);mix-blend-mode:screen}
 .hero-inner{position:relative;max-width:1240px;margin:0 auto;padding:88px 32px 96px;display:flex;flex-wrap:wrap;align-items:center;gap:48px 64px}
 .hero-copy{flex:1 1 460px;min-width:0;display:flex;flex-direction:column;gap:24px;color:#fff}
 .hero-copy .eyebrow{color:var(--accent)}
@@ -131,6 +132,7 @@ button,input,select{font:inherit;color:inherit}
 .counter{background:var(--ink);color:#fff;border-radius:24px;padding:18px 22px;min-width:200px;box-shadow:0 16px 40px rgba(14,21,66,.3)}
 .counter span{font-size:13px;color:#C9D0EC;display:block}
 .counter b{font-family:var(--display);font-size:42px;line-height:1.1;color:var(--accent)}
+.counter b span{display:inline;font-size:inherit;color:inherit}
 .caps{position:relative;min-height:112px;max-width:540px}
 .cap{position:absolute;left:0;right:0;bottom:0;display:flex;gap:14px;align-items:center;padding:16px 20px;border-radius:20px;background:rgba(255,255,255,.95);box-shadow:0 16px 40px rgba(14,21,66,.18);font-size:16px;line-height:1.45}
 .cap .t{flex:none;padding:6px 12px;border-radius:999px;background:var(--ink);color:var(--accent);font-family:var(--display);font-weight:600;font-size:14px}
@@ -346,3 +348,14 @@ input[type=range]{width:100%;height:44px;accent-color:var(--accent);cursor:point
 .confetti{position:fixed;width:0;height:0;z-index:100;pointer-events:none}
 .confetti i{position:absolute;left:0;top:0;width:10px;height:14px;border-radius:2px;animation:avn-confetti 1.5s cubic-bezier(.15,.7,.3,1) both}
 @keyframes avn-confetti{0%{transform:translate(0,0) rotate(0);opacity:1}75%{opacity:1}100%{transform:translate(var(--x),calc(var(--y) + 170px)) rotate(var(--r));opacity:0}}
+
+/* sun journey: scrolling the page = one solar day (sits in the left margin on wide screens) */
+.sunday{position:fixed;left:8px;bottom:18px;z-index:60;width:92px;padding:8px 8px 6px;border-radius:16px;background:rgba(255,255,255,.92);box-shadow:0 10px 26px rgba(17,24,71,.18);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);pointer-events:none}
+.sunday svg{display:block;width:76px;height:40px;overflow:visible}
+.sd-arc{fill:none;stroke:#C9D4EA;stroke-width:1.6;stroke-dasharray:2 4}
+.sd-ground{stroke:#111847;stroke-width:1.6;stroke-linecap:round}
+.sd-sun{position:absolute;left:0;top:0;width:12px;height:12px;border-radius:50%;background:#FFC12E;box-shadow:0 0 0 4px rgba(255,193,46,.3),0 0 14px 3px rgba(255,193,46,.6);offset-path:path('M14 44 A32 32 0 0 1 78 44');offset-anchor:50% 50%;offset-rotate:0deg}
+.sd-text{display:flex;flex-direction:column;margin-top:3px;font-size:10px;line-height:1.3;color:#3A4170;white-space:nowrap}
+.sd-text b{font-family:var(--display);font-size:11px;color:#111847}
+@media (max-width:1359px){.sunday{display:none!important}}
+.avn-words .w{display:inline-block}

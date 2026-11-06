@@ -40,7 +40,7 @@
         <button type="button" class="ta" :class="lang === 'ta' && 'on'" :aria-pressed="(lang === 'ta').toString()" @click="lang = 'ta'" lang="ta">தமிழ்</button>
       </div>
       <a class="btn btn-line btn-sm avn-btn" href="/portal/login"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/></svg>Customer login</a>
-      <a class="btn btn-accent btn-sm avn-shine" href="#contact">Get free quote</a>
+      <a class="btn btn-accent btn-sm avn-shine avn-magnet" href="#contact">Get free quote</a>
     </div>
   </div>
 </header>
@@ -53,6 +53,7 @@
       <template x-for="(h, i) in heroSlides" :key="h.src"><img class="hero-media hero-slide" :class="i === slide && 'on'" :src="h.src" alt="" decoding="async"></template>
     </div>
     <div class="hero-shade" aria-hidden="true"></div>
+    <div class="hero-glow" aria-hidden="true"></div>
     <span class="spark avn-spark" aria-hidden="true" style="left:6%;bottom:8%;width:10px;height:10px;background:var(--accent)"></span>
     <span class="spark avn-spark avn-spark-2" aria-hidden="true" style="left:34%;bottom:4%;width:8px;height:8px;background:var(--sky)"></span>
     <span class="spark avn-spark avn-spark-3" aria-hidden="true" style="left:58%;bottom:12%;width:12px;height:12px;background:var(--orange)"></span>
@@ -70,7 +71,7 @@
           <p class="ta-p">வீடு, வணிகம், தொழிற்சாலை — சர்வே முதல் மின் இணைப்பு வரை ஒரே குழு.</p>
         </div>
         <div class="hero-ctas avn-in avn-in-2">
-          <a class="btn btn-accent avn-btn avn-shine avn-wiggle" href="#contact"><span x-text="lang === 'ta' ? 'இலவச விலைப்பட்டியல்' : 'Get my free quote'">Get my free quote</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></a>
+          <a class="btn btn-accent avn-btn avn-shine avn-wiggle avn-magnet" href="#contact"><span x-text="lang === 'ta' ? 'இலவச விலைப்பட்டியல்' : 'Get my free quote'">Get my free quote</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></a>
           <a class="btn btn-outline-light avn-btn" href="#calculator" x-text="lang === 'ta' ? 'சேமிப்பைக் கணக்கிடுங்கள்' : 'Calculate my savings'">Calculate my savings</a>
         </div>
         <ul class="trust" aria-label="Included with every AVN system">
@@ -133,7 +134,7 @@
     <div class="head"><span class="eyebrow avn-rv">What we build</span><h2 class="h2 avn-rv-wipe">One partner for every roof, shed and field.</h2></div>
     <div class="cards">
       <template x-for="(c, i) in solutions" :key="i">
-        <div :class="'avn-rv avn-st-' + (i + 1)">
+        <div :class="'avn-tilt avn-st-' + (i + 1)">
           <a class="sol avn-lift" href="#contact" @pointermove="tilt($event)" @pointerleave="untilt($event)">
             <template x-if="c.photo"><img class="photo" :src="c.photo.src" :alt="c.photo.alt" loading="lazy"></template>
             <span class="num" x-text="'0' + (i + 1)" x-show="!c.photo"></span>
@@ -222,7 +223,7 @@
     <span class="eyebrow" style="color:var(--accent)">Go solar with AVN</span>
     <h2 class="avn-rv-wipe">Your roof could be next.</h2>
     <p class="avn-rv">Survey, design, installation, net-metering and subsidy — one team, start to switch-on.</p>
-    <a class="btn btn-accent avn-btn avn-shine avn-wiggle avn-rv" href="#contact">Get my free quote</a>
+    <a class="btn btn-accent avn-btn avn-shine avn-wiggle avn-magnet" href="#contact">Get my free quote</a>
   </div>
 </section>
 
@@ -338,7 +339,7 @@
     <div class="head"><span class="eyebrow avn-rv">Recent work</span><h2 class="h2 avn-rv-wipe">Powering Tamil Nadu, roof by roof.</h2></div>
     <div class="work" x-show="gallery.length">
       <template x-for="(g, i) in gallery.slice(0, 9)" :key="i">
-        <div :class="'avn-rv avn-st-' + ((i % 3) + 1)">
+        <div :class="'avn-tilt avn-st-' + ((i % 3) + 1)">
           <article class="avn-lift">
             <div class="pic avn-rv-circle">
               <img :src="g.kind === 'video' ? (g.poster || '/assets/hero-poster.webp') : g.src" :alt="g.alt" loading="lazy">
@@ -351,9 +352,9 @@
       </template>
     </div>
     <div class="work" x-show="!gallery.length">
-      <div class="avn-rv avn-st-1"><article class="avn-lift"><div class="pic avn-rv-circle"><svg viewBox="0 0 400 240" role="img" aria-label="Illustration of a home rooftop system"><rect width="400" height="240" fill="#DDEBFB"/><circle class="avn-svg-c avn-breathe" cx="330" cy="60" r="30" fill="#FFC12E"/><g class="avn-cloud"><ellipse cx="60" cy="50" rx="34" ry="12" fill="#fff"/><ellipse cx="80" cy="42" rx="20" ry="12" fill="#fff"/></g><rect y="200" width="400" height="40" fill="#C4D7F1"/><rect x="100" y="112" width="200" height="88" fill="#fff"/><rect x="124" y="136" width="30" height="26" fill="#C4D7F1"/><rect x="246" y="136" width="30" height="26" fill="#C4D7F1"/><rect x="184" y="150" width="32" height="50" fill="#111847"/><path d="M120 112 V96 M176 112 V96 M232 112 V96 M288 112 V96" stroke="#111847" stroke-width="3"/><rect width="56" height="12" fill="#1D50B5" transform="translate(116 92) rotate(-12)"/><rect width="56" height="12" fill="#1D50B5" transform="translate(172 92) rotate(-12)"/><rect width="56" height="12" fill="#1D50B5" transform="translate(228 92) rotate(-12)"/></svg><div class="avn-glint" aria-hidden="true"></div></div><div class="body"><span class="kind">Homes</span><h3>Rooftop solar with subsidy</h3></div></article></div>
-      <div class="avn-rv avn-st-2"><article class="avn-lift"><div class="pic avn-rv-circle"><svg viewBox="0 0 400 240" role="img" aria-label="Illustration of a factory rooftop system"><rect width="400" height="240" fill="#FFF1D6"/><circle class="avn-svg-c avn-breathe" cx="70" cy="58" r="30" fill="#FFC12E"/><rect y="200" width="400" height="40" fill="#F2DDB4"/><rect x="40" y="128" width="320" height="72" fill="#fff"/><path d="M40 128 L200 100 L360 128 Z" fill="#C9D3E6"/><rect width="34" height="11" fill="#1D50B5" transform="translate(62 118) rotate(-10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(100 111) rotate(-10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(138 104) rotate(-10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(228 100) rotate(10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(266 107) rotate(10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(304 114) rotate(10)"/><rect x="70" y="150" width="60" height="50" fill="#111847"/></svg><div class="avn-glint avn-glint-2" aria-hidden="true"></div></div><div class="body"><span class="kind">Industry</span><h3>Factory and mill rooftops</h3></div></article></div>
-      <div class="avn-rv avn-st-3"><article class="avn-lift"><div class="pic avn-rv-circle"><svg viewBox="0 0 400 240" role="img" aria-label="Illustration of a ground-mount plant"><rect width="400" height="240" fill="#E2F3FB"/><circle class="avn-svg-c avn-breathe" cx="200" cy="56" r="30" fill="#FFC12E"/><rect y="140" width="400" height="100" fill="#CFE0F2"/><path d="M30 150 L120 136 L124 146 L34 160 Z M150 150 L240 136 L244 146 L154 160 Z M270 150 L360 136 L364 146 L274 160 Z" fill="#1D50B5"/><path d="M10 182 L130 164 L135 177 L15 195 Z M150 182 L270 164 L275 177 L155 195 Z M290 182 L410 164 L415 177 L295 195 Z" fill="#1D50B5"/><path d="M0 222 L150 200 L156 216 L6 238 Z M170 222 L320 200 L326 216 L176 238 Z" fill="#1D50B5"/></svg><div class="avn-glint avn-glint-3" aria-hidden="true"></div></div><div class="body"><span class="kind">Ground-mount</span><h3>Open-land solar plants</h3></div></article></div>
+      <div class="avn-tilt avn-st-1"><article class="avn-lift"><div class="pic avn-rv-circle"><svg viewBox="0 0 400 240" role="img" aria-label="Illustration of a home rooftop system"><rect width="400" height="240" fill="#DDEBFB"/><circle class="avn-svg-c avn-breathe" cx="330" cy="60" r="30" fill="#FFC12E"/><g class="avn-cloud"><ellipse cx="60" cy="50" rx="34" ry="12" fill="#fff"/><ellipse cx="80" cy="42" rx="20" ry="12" fill="#fff"/></g><rect y="200" width="400" height="40" fill="#C4D7F1"/><rect x="100" y="112" width="200" height="88" fill="#fff"/><rect x="124" y="136" width="30" height="26" fill="#C4D7F1"/><rect x="246" y="136" width="30" height="26" fill="#C4D7F1"/><rect x="184" y="150" width="32" height="50" fill="#111847"/><path d="M120 112 V96 M176 112 V96 M232 112 V96 M288 112 V96" stroke="#111847" stroke-width="3"/><rect width="56" height="12" fill="#1D50B5" transform="translate(116 92) rotate(-12)"/><rect width="56" height="12" fill="#1D50B5" transform="translate(172 92) rotate(-12)"/><rect width="56" height="12" fill="#1D50B5" transform="translate(228 92) rotate(-12)"/></svg><div class="avn-glint" aria-hidden="true"></div></div><div class="body"><span class="kind">Homes</span><h3>Rooftop solar with subsidy</h3></div></article></div>
+      <div class="avn-tilt avn-st-2"><article class="avn-lift"><div class="pic avn-rv-circle"><svg viewBox="0 0 400 240" role="img" aria-label="Illustration of a factory rooftop system"><rect width="400" height="240" fill="#FFF1D6"/><circle class="avn-svg-c avn-breathe" cx="70" cy="58" r="30" fill="#FFC12E"/><rect y="200" width="400" height="40" fill="#F2DDB4"/><rect x="40" y="128" width="320" height="72" fill="#fff"/><path d="M40 128 L200 100 L360 128 Z" fill="#C9D3E6"/><rect width="34" height="11" fill="#1D50B5" transform="translate(62 118) rotate(-10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(100 111) rotate(-10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(138 104) rotate(-10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(228 100) rotate(10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(266 107) rotate(10)"/><rect width="34" height="11" fill="#1D50B5" transform="translate(304 114) rotate(10)"/><rect x="70" y="150" width="60" height="50" fill="#111847"/></svg><div class="avn-glint avn-glint-2" aria-hidden="true"></div></div><div class="body"><span class="kind">Industry</span><h3>Factory and mill rooftops</h3></div></article></div>
+      <div class="avn-tilt avn-st-3"><article class="avn-lift"><div class="pic avn-rv-circle"><svg viewBox="0 0 400 240" role="img" aria-label="Illustration of a ground-mount plant"><rect width="400" height="240" fill="#E2F3FB"/><circle class="avn-svg-c avn-breathe" cx="200" cy="56" r="30" fill="#FFC12E"/><rect y="140" width="400" height="100" fill="#CFE0F2"/><path d="M30 150 L120 136 L124 146 L34 160 Z M150 150 L240 136 L244 146 L154 160 Z M270 150 L360 136 L364 146 L274 160 Z" fill="#1D50B5"/><path d="M10 182 L130 164 L135 177 L15 195 Z M150 182 L270 164 L275 177 L155 195 Z M290 182 L410 164 L415 177 L295 195 Z" fill="#1D50B5"/><path d="M0 222 L150 200 L156 216 L6 238 Z M170 222 L320 200 L326 216 L176 238 Z" fill="#1D50B5"/></svg><div class="avn-glint avn-glint-3" aria-hidden="true"></div></div><div class="body"><span class="kind">Ground-mount</span><h3>Open-land solar plants</h3></div></article></div>
     </div>
   </div>
 </section>
@@ -462,6 +463,12 @@
     </div>
   </div>
 </footer>
+
+<div class="sunday" aria-hidden="true" x-show="motion" x-cloak>
+  <svg viewBox="0 0 76 40"><path class="sd-arc" d="M6 36 A32 32 0 0 1 70 36"/><path class="sd-ground" d="M2 36 H74"/></svg>
+  <span class="sd-sun" :style="'offset-distance:' + (dayP * 100).toFixed(1) + '%'"></span>
+  <span class="sd-text"><b x-text="dayClock"></b><span x-text="dayKwh + ' kWh made'"></span></span>
+</div>
 
 <a class="wa-float" x-show="company.whatsapp" x-cloak :class="scrolled && 'up'" :href="waLink(company.whatsappMessage)" target="_blank" rel="noopener" aria-label="Chat with AVN Solar on WhatsApp" @click="waBubble = false">
   <span class="wa-ring" aria-hidden="true"></span><span class="wa-ring wa-ring-2" aria-hidden="true"></span>

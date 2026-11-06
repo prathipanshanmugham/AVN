@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>CEO Dashboard — AVN Workspace</title>
+<link rel="icon" href="/assets/logo.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<link rel="stylesheet" href="/admin/assets/dashboard.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/dashboard.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main viz" x-data="dash" x-cloak>
+  <div class="topbar">
+    <div><h1 class="title">CEO Dashboard</h1><div class="sub">How AVN is doing — installations, sales, delivery and money, in one place.</div></div>
+    <label class="field" style="flex-direction:row;align-items:center;gap:10px">Period
+      <select class="select" style="width:auto" x-model="period" @change="load()">
+        <template x-for="p in periods" :key="p.key"><option :value="p.key" x-text="p.label" :selected="p.key === period"></option></template>
+      </select></label>
+  </div>
+
+  <template x-if="d">
+    <div class="stack" style="gap:20px">
+      <!-- Health score -->
+      <section class="card health" aria-label="Company health score">
+        <div class="health-main">
+          <span class="eyebrow">Company health score</span>
+          <div class="hero-row">
+            <b class="hero" x-text="d.health.score === null ? '—' : shownScore"></b><span class="of" x-show="d.health.score !== null">/ 100</span>
+          </div>
+          <span class="grade" :class="'tone-' + d.health.tone"><i aria-hidden="true" x-text="toneIcon(d.health.tone)"></i><span x-text="d.health.label"></span></span>
+          <div class="meter" role="meter" aria-label="Health score" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="d.health.score || 0" :class="'tone-' + d.health.tone"><i :style="'width:' + (anim ? (d.health.score || 0) : 0) + '%'"></i></div>
+          <p class="small muted" style="margin:0">Weighted from six measures. A measure without enough data yet is left out, so the score stays fair while AVN fills in records.</p>
+        </div>
+        <div class="parts">
+          <template x-for="p in d.health.parts" :key="p.key">
+            <div class="part" :class="p.score === null && 'na'">
+              <div class="row between" style="flex-wrap:nowrap;gap:8px"><b x-text="p.label"></b><span class="small muted" x-text="p.weight + '% of score'"></span></div>
+              <div class="part-row">
+                <div class="meter sm" :class="'tone-' + toneFor(p.score)"><i :style="'width:' + (anim && p.score !== null ? p.score : 0) + '%'"></i></div>
+                <b class="part-score" x-text="p.score === null ? 'n/a' : p.score"></b>
+              </div>
+              <span class="small muted" x-text="p.detail + (p.score !== null ? ' · target: ' + p.target : '')"></span>
+            </div>
+          </template>
+        </div>
+      </section>
+
+      <!-- KPI tiles -->
+      <div class="kpis">
+        <div class="kpi dark"><span x-text="'Installed · ' + d.period.label.toLowerCase()"></span><b x-text="kw(d.kpis.installedKw)"></b><small x-text="d.kpis.handedOver + ' project' + (d.kpis.handedOver === 1 ? '' : 's') + ' handed over'"></small></div>
+        <div class="kpi"><span>Installed, all time</span><b x-text="kw(d.kpis.installedKwAll)"></b></div>
+        <div class="kpi"><span>In progress</span><b x-text="kw(d.kpis.inProgressKw)"></b><small x-text="d.kpis.activeProjects + ' active projects'"></small></div>
+        <div class="kpi"><span>Open pipeline</span><b x-text="AVN.money(d.kpis.pipelineLakh)"></b><small x-text="d.kpis.openLeads + ' open leads'"></small></div>
+        <div class="kpi"><span x-text="'New leads · ' + d.period.label.toLowerCase()"></span><b x-text="d.kpis.newLeads"></b></div>
+        <div class="kpi"><span>Quotations sent</span><b x-text="d.kpis.quotesSent"></b><small x-text="d.kpis.quotesCreated + ' created'"></small></div>
+        <div class="kpi"><span>Orders accepted</span><b x-text="AVN.inr(d.kpis.acceptedValue)"></b><small x-text="d.kpis.acceptedCount + ' quotation' + (d.kpis.acceptedCount === 1 ? '' : 's')"></small></div>
+        <div class="kpi"><span>Still to collect</span><b x-text="AVN.inr(d.kpis.balance)"></b><small x-text="'of ' + AVN.inr(d.kpis.orderValue) + ' order value'"></small></div>
+      </div>
+      <div class="card tight small" style="background:#FFF4C2;border-color:#FFE59A" x-show="d.kpis.missingCapacity">
+        <b x-text="d.kpis.missingCapacity + ' project' + (d.kpis.missingCapacity === 1 ? ' has' : 's have') + ' no kWp yet'"></b> and aren’t counted in the kW figures. Add the capacity under <a href="/admin/projects">Projects → Edit</a>.
+      </div>
+
+      <div class="grid" style="--min:380px">
+        <!-- System split -->
+        <section class="card stack" aria-label="kW by system type">
+          <div><h2 class="h2">On-grid · Hybrid · Off-grid</h2><div class="small muted" x-text="'kW handed over · ' + d.period.label.toLowerCase()"></div></div>
+          <div class="seg" role="img" :aria-label="d.bySystem.map(s => s.system + ' ' + kw(s.installedKw)).join(', ')">
+            <template x-for="s in d.bySystem.filter(x => x.installedKw > 0)" :key="s.system">
+              <div class="seg-part" :style="'flex:' + s.installedKw + ' 1 0;background:' + color(s.system)" @mousemove="tip($event, s.system, [kw(s.installedKw) + ' installed', s.installedCount + ' projects', pct(s.installedKw, sysTotal) + ' of the period'])" @mouseleave="tipOff()">
+                <span x-show="pct(s.installedKw, sysTotal, true) >= 9" :class="s.system === 'Hybrid' && 'dark-ink'" x-text="pct(s.installedKw, sysTotal)"></span>
+              </div>
+            </template>
+            <div class="seg-empty" x-show="!sysTotal">No kW handed over in this period</div>
+          </div>
+          <div class="legend"><template x-for="s in d.bySystem" :key="s.system"><span><i :style="'background:' + color(s.system)"></i><span x-text="s.system"></span></span></template></div>
+          <div class="rows">
+            <div class="rowline small muted" style="font-weight:700"><span>System</span><span class="row" style="gap:20px"><span style="width:90px;text-align:right">Installed</span><span style="width:90px;text-align:right">In progress</span></span></div>
+            <template x-for="s in d.bySystem" :key="s.system">
+              <div class="rowline"><span class="row" style="gap:8px"><i class="sw" :style="'background:' + color(s.system)"></i><b x-text="s.system"></b></span>
+                <span class="row num" style="gap:20px;flex-wrap:nowrap"><span style="width:90px;text-align:right" x-text="kw(s.installedKw)"></span><span style="width:90px;text-align:right" class="muted" x-text="kw(s.inProgressKw)"></span></span></div>
+            </template>
+          </div>
+        </section>
+
+        <!-- Monthly handovers -->
+        <section class="card stack" aria-label="kW handed over per month">
+          <div><h2 class="h2">kW handed over per month</h2><div class="small muted">Last 12 months · hover a month for the split</div></div>
+          <div class="cols">
+            <div class="cols-grid" aria-hidden="true"><i :data-v="kwShort(monthMax)"></i><i :data-v="kwShort(monthMax / 2)"></i><i data-v="0"></i></div>
+            <template x-for="(m, i) in d.monthly" :key="m.month">
+              <div class="mcol" @mousemove="tip($event, monthName(m.month, true), [kw(m.kw) + ' · ' + m.projects + ' projects'].concat(systems.filter(t => m[t]).map(t => t + ': ' + kw(m[t]))))" @mouseleave="tipOff()">
+                <div class="mcol-bar"><i :style="'height:' + (anim ? (m.kw / monthMax * 100) : 0) + '%;transition-delay:' + (i * 40) + 'ms'"></i>
+                  <b class="cap" x-show="m.kw && (m.kw === monthMax || i === d.monthly.length - 1)" :style="'bottom:calc(' + (m.kw / monthMax * 100) + '% + 4px)'" x-text="kwShort(m.kw)"></b></div>
+                <span class="mcol-label" x-text="monthName(m.month)"></span>
+              </div>
+            </template>
+          </div>
+        </section>
+      </div>
+
+      <!-- Per location -->
+      <section class="card stack" aria-label="kW installed per location">
+        <div class="row between"><div><h2 class="h2">kW installed per location</h2><div class="small muted" x-text="'Handed over · ' + d.period.label.toLowerCase() + ' · hover a bar for details'"></div></div>
+          <div class="legend"><template x-for="t in systems" :key="t"><span><i :style="'background:' + color(t)"></i><span x-text="t"></span></span></template></div></div>
+        <div class="hbars">
+          <template x-for="(r, i) in located" :key="r.place">
+            <div class="hbar">
+              <span class="hbar-label" x-text="r.place"></span>
+              <div class="hbar-track">
+                <div class="hbar-fill" :style="'width:calc((100% - 76px) * ' + (anim ? r.total / locMax : 0) + ');transition-delay:' + (i * 50) + 'ms'">
+                  <template x-for="t in systems.filter(t => r.installed[t])" :key="t">
+                    <i :style="'flex:' + r.installed[t] + ' 1 0;background:' + color(t)" @mousemove="tip($event, r.place + ' · ' + t, [kw(r.installed[t]) + ' installed', 'Total here: ' + kw(r.total) + ' across ' + r.projects + ' projects'])" @mouseleave="tipOff()"></i>
+                  </template>
+                </div>
+                <b class="hbar-val" x-text="kw(r.total)"></b>
+              </div>
+            </div>
+          </template>
+          <div class="empty" x-show="!located.length">No projects handed over in this period. Try “All time”.</div>
+        </div>
+        <details>
+          <summary class="link">Show as table</summary>
+          <div class="table-wrap">
+            <table class="tbl">
+              <thead><tr><th>Location</th><th class="num">On-grid</th><th class="num">Hybrid</th><th class="num">Off-grid</th><th class="num">Installed</th><th class="num">Projects</th><th class="num">In progress</th></tr></thead>
+              <tbody><template x-for="r in d.byLocation" :key="r.place"><tr><td x-text="r.place"></td><td class="num" x-text="kw(r.installed['On-grid'])"></td><td class="num" x-text="kw(r.installed.Hybrid)"></td><td class="num" x-text="kw(r.installed['Off-grid'])"></td><td class="num"><b x-text="kw(r.total)"></b></td><td class="num" x-text="r.projects"></td><td class="num" x-text="kw(r.inProgressKw)"></td></tr></template></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <div class="grid" style="--min:320px">
+        <!-- Reports -->
+        <section class="card stack" aria-label="PDF reports">
+          <div><h2 class="h2">PDF reports</h2><div class="small muted" x-text="'For ' + d.period.label.toLowerCase() + ' — change the period at the top'"></div></div>
+          <template x-for="r in reportList" :key="r.key">
+            <div class="report">
+              <span class="report-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 3 H14 L19 8 V21 H6 Z"/><path d="M14 3 V8 H19"/><path d="M9 13 H16 M9 16.5 H14"/></svg></span>
+              <span style="flex:1;min-width:0"><b x-text="r.title"></b><br><span class="small muted" x-text="r.desc"></span></span>
+              <a class="btn sm dark" :href="'/api/reports/' + r.key + '.pdf?period=' + period" download>Download PDF</a>
+            </div>
+          </template>
+        </section>
+
+        <!-- Pipeline -->
+        <section class="card stack" aria-label="Sales pipeline">
+          <div><h2 class="h2">Sales pipeline</h2><div class="small muted">Leads in each stage right now</div></div>
+          <div class="hbars">
+            <template x-for="(s, i) in d.leadStages" :key="s.name">
+              <div class="hbar">
+                <span class="hbar-label" x-text="s.name"></span>
+                <div class="hbar-track"><div class="hbar-fill" :style="'width:calc((100% - 76px) * ' + (anim ? s.count / stageMax : 0) + ');transition-delay:' + (i * 50) + 'ms'"><template x-if="s.count"><i :style="'flex:1;background:' + (s.name === 'Lost' ? '#B9C1D6' : '#1D50B5')"></i></template></div><b class="hbar-val" x-text="s.count"></b></div>
+              </div>
+            </template>
+          </div>
+          <div x-show="d.leadSources.length">
+            <div class="eyebrow" style="color:var(--muted);margin:8px 0" x-text="'New leads by source · ' + d.period.label.toLowerCase()"></div>
+            <div class="chips"><template x-for="s in d.leadSources" :key="s.source"><span class="badge" x-text="s.source + ' · ' + s.count"></span></template></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </template>
+  <div class="empty" x-show="!d && !error">Loading…</div>
+  <div class="error" x-show="error" x-text="error"></div>
+
+  <div class="viz-tip" x-show="tipOn" x-cloak :style="'left:' + tipX + 'px;top:' + tipY + 'px'" role="tooltip">
+    <b x-text="tipTitle"></b>
+    <template x-for="l in tipLines" :key="l"><span x-text="l"></span></template>
+  </div>
+</main>
+</div>
+</body>
+</html>

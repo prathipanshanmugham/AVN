@@ -12,6 +12,7 @@ Every website enquiry (quote wizard, offer popup, calculator, WhatsApp) lands in
 
 ## What's inside
 
+- **CEO Dashboard** (admins; staff only if allowed in Permissions) — company health score out of 100 from six measures (lead win rate, follow-ups on time, projects on schedule, money collected, service requests, installation growth), kW installed per location split into on-grid / hybrid / off-grid, monthly handovers, pipeline, and downloadable PDF reports (company, installations, leads & quotations, collections) for any period.
 - **Website lead capture** — 4-step quote wizard with a live size/savings estimate, once-a-week offer popup (timed or on exit), "send me this estimate" on the calculator, floating WhatsApp button with a pre-filled message, mobile Call / Quote bar. Ad tags (`utm_*`, `gclid`, `fbclid`) set the lead source; repeat enquiries from the same mobile within a day update the same lead.
 - **CRM** — pipeline (New lead → Site survey → Quotation sent → Negotiation → Won / Lost), follow-up dates, owners, notes, call/WhatsApp buttons, convert a won lead into a project.
 - **Quotations** — create from a lead or from scratch; price line, panel count and scope of supply fill in from the kWp and Settings rates. GST as a solar EPC contract (70% @ 5% + 30% @ 18%) or per line, CGST/SGST or IGST, discount, PM Surya Ghar subsidy shown as information, amount in words, numbering per financial year (`AVN-Q/26-27/0001`), printable A4 / Save as PDF, WhatsApp share, revisions. Marking a quote Sent or Accepted moves the lead along the pipeline.
@@ -77,7 +78,7 @@ Database changes are applied automatically when the app starts (`PRAGMA user_ver
 ## Folder layout
 
 ```
-server/          Express app, SQLite schema, auth, API routes
+server/          Express app, SQLite schema, auth, API routes, dashboard metrics, PDF reports (fonts/: DM Sans, OFL licence)
 admin/           Staff back end pages (Alpine.js)
 portal/          Customer portal pages
 public/          Website (index.html, assets, default hero video)

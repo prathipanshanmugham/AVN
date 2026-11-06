@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, STAGES_PROJECT, PROJECT_FIELDS, ASSET_KINDS, createProjectTasks } = require('../db');
+const { db, STAGES_PROJECT, PROJECT_FIELDS, ASSET_KINDS, SYSTEM_TYPES, parseKw, createProjectTasks } = require('../db');
 const { requirePerm } = require('../auth');
 const { docUpload, removeFile, DOCS_DIR } = require('../uploads');
 const { str, optStr, num, int, date, bool, url, bad, notFound } = require('../util');
@@ -17,6 +17,7 @@ const projectOut = (p) => ({
   stage: p.stage, pmId: p.pm_id, pmName: p.pm_name || '', targetDate: p.target_date || '', notes: p.notes || '',
   clientId: p.client_id, clientName: p.client_name || '', clientCode: p.client_code || '', leadId: p.lead_id,
   driveLink: p.drive_link || '', details: parse(p.details, {}),
+  capacityKw: p.capacity_kw, systemType: p.system_type || 'On-grid', completedAt: p.completed_at || '',
   createdAt: p.created_at, updatedAt: p.updated_at,
 });
 
@@ -32,6 +33,12 @@ function fields(body, existing = {}) {
     target_date: pick('targetDate', (v) => date(v), 'target_date'),
     client_id: pick('clientId', (v) => int(v, null), 'client_id'),
     notes: pick('notes', (v) => optStr(v, 2000)),
+    capacity_kw: pick('capacityKw', (v) => {
+      const n = num(v, null);
+      if (n !== null && (n <= 0 || n > 100000)) throw bad('Capacity must be in kWp, e.g. 5');
+      return n;
+    }, 'capacity_kw'),
+    system_type: pick('systemType', (v) => (SYSTEM_TYPES.includes(v) ? v : 'On-grid'), 'system_type'),
     drive_link: pick('driveLink', (v) => {
       if (!str(v)) return null;
       const u = url(v);
@@ -40,6 +47,8 @@ function fields(body, existing = {}) {
     }, 'drive_link'),
   };
   if (!out.name) throw bad('Enter a project name');
+  if (out.capacity_kw == null && body.capacityKw === undefined) out.capacity_kw = parseKw(out.kwp);
+  if (!out.system_type) out.system_type = 'On-grid';
   if (out.client_id && !db.prepare('SELECT 1 FROM clients WHERE id = ?').get(out.client_id)) throw bad('Unknown client');
   return out;
 }
@@ -50,7 +59,7 @@ function progress(projectId) {
 
 router.get('/projects', (req, res) => {
   res.json({
-    stages: STAGES_PROJECT, fields: PROJECT_FIELDS, assetKinds: ASSET_KINDS,
+    stages: STAGES_PROJECT, fields: PROJECT_FIELDS, assetKinds: ASSET_KINDS, systemTypes: SYSTEM_TYPES,
     projects: db.prepare(SELECT + ' ORDER BY p.stage >= 6, p.target_date IS NULL, p.target_date').all().map(projectOut),
   });
 });
@@ -75,8 +84,9 @@ router.post('/projects', (req, res) => {
   const f = fields(req.body);
   let id;
   db.transaction(() => {
-    id = db.prepare('INSERT INTO projects (name, place, kwp, type, value_lakh, pm_id, target_date, client_id, notes, drive_link) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .run(f.name, f.place, f.kwp, f.type, f.value_lakh, f.pm_id || req.user.id, f.target_date, f.client_id, f.notes, f.drive_link).lastInsertRowid;
+    id = db.prepare(`INSERT INTO projects (name, place, kwp, type, value_lakh, pm_id, target_date, client_id, notes, drive_link, capacity_kw, system_type)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(f.name, f.place, f.kwp, f.type, f.value_lakh, f.pm_id || req.user.id, f.target_date, f.client_id, f.notes, f.drive_link, f.capacity_kw, f.system_type).lastInsertRowid;
     createProjectTasks(id);
   })();
   res.status(201).json(projectOut(db.prepare(SELECT + ' WHERE p.id = ?').get(id)));
@@ -91,8 +101,15 @@ router.patch('/projects/:id', (req, res) => {
     stage = int(req.body.stage, p.stage);
     if (stage < 0 || stage > STAGES_PROJECT.length) throw bad('Unknown stage');
   }
-  db.prepare(`UPDATE projects SET name=?, place=?, kwp=?, type=?, value_lakh=?, pm_id=?, target_date=?, client_id=?, notes=?, drive_link=?, stage=?, updated_at=datetime('now') WHERE id=?`)
-    .run(f.name, f.place, f.kwp, f.type, f.value_lakh, f.pm_id, f.target_date, f.client_id, f.notes, f.drive_link, stage, p.id);
+  // Handed over = installed: the dashboard counts kW by this date.
+  let completed = p.completed_at;
+  if (stage >= STAGES_PROJECT.length && !completed) completed = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+  if (stage < STAGES_PROJECT.length) completed = null;
+  if (req.body.completedAt !== undefined && stage >= STAGES_PROJECT.length) completed = date(req.body.completedAt) || completed;
+  db.prepare(`UPDATE projects SET name=?, place=?, kwp=?, type=?, value_lakh=?, pm_id=?, target_date=?, client_id=?, notes=?, drive_link=?,
+    capacity_kw=?, system_type=?, stage=?, completed_at=?, updated_at=datetime('now') WHERE id=?`)
+    .run(f.name, f.place, f.kwp, f.type, f.value_lakh, f.pm_id, f.target_date, f.client_id, f.notes, f.drive_link,
+      f.capacity_kw, f.system_type, stage, completed, p.id);
   res.json(projectOut(db.prepare(SELECT + ' WHERE p.id = ?').get(p.id)));
 });
 

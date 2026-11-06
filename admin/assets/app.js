@@ -1,6 +1,7 @@
 /* Shared code for the AVN staff back end. Loaded before the page script and Alpine. */
 (function () {
   const ICONS = {
+    dashboard: '<path d="M3.5 17 A8.5 8.5 0 1 1 20.5 17"/><path d="M12 17 L16 10"/><circle cx="12" cy="17" r="1.6"/>',
     crm: '<path d="M3 5 H21 L14 13 V19 L10 21 V13 Z"/>',
     quotes: '<path d="M6 3 H15 L19 7 V21 H6 Z"/><path d="M15 3 V7 H19"/><path d="M9 10.5 H15 M9 13.5 H15 M11 10.5 C13.6 10.5 13.6 13.5 11 13.5 L14 17.5"/>',
     projects: '<path d="M4 6 H20 L22 16 H2 Z"/><path d="M9 6 L8 16 M15 6 L16 16 M3 11 H21"/><path d="M12 16 V20 M8 20 H16"/>',
@@ -11,6 +12,7 @@
     account: '<circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/>',
   };
   const NAV = [
+    { key: 'dashboard', label: 'CEO Dashboard', perm: 'dashboard' },
     { key: 'crm', label: 'CRM', perm: 'crm' },
     { key: 'quotes', label: 'Quotations', perm: 'quotes' },
     { key: 'projects', label: 'Projects', perm: 'projects' },

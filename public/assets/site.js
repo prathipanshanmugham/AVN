@@ -99,6 +99,17 @@
     setTimeout(() => box.remove(), 1800);
   }
 
+  // Section headings rise word by word as they scroll in.
+  if (!reducedMotion()) {
+    document.querySelectorAll('h2.avn-rv-wipe').forEach((h) => {
+      if (h.children.length) return;
+      const words = h.textContent.trim().split(/\s+/);
+      h.classList.remove('avn-rv-wipe');
+      h.classList.add('avn-words');
+      h.innerHTML = words.map((w, i) => '<span class="w" style="--i:' + i + '">' + w.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) + '</span>').join(' ');
+    });
+  }
+
   document.addEventListener('alpine:init', () => {
     Alpine.data('site', () => ({
       lang: 'en', now: Date.now(), step: 0, pinned: false, faq: 0,
@@ -108,7 +119,7 @@
       popup: { enabled: false, delay: 25, title: '' },
       videoReady: false, lightbox: null, slide: 0, bandSlide: 0, wi: 0, scrolled: false,
       steps: STEPS, faqs: FAQS, WIZ_TYPES, BILLS, ROOFS, heroWords: HERO_WORDS,
-      utm: {}, sending: false, leadSent: false,
+      utm: {}, sending: false, leadSent: false, dayP: 0,
       wiz: { step: 0, type: '', bill: '', billValue: 0, roof: '', name: '', phone: '', district: '', website: '' }, wizError: '', wizFlash: false,
       calcForm: { name: '', phone: '' }, calcError: '', calcSent: false,
       pop: { name: '', phone: '' }, popOpen: false, popSent: false, popError: '', waBubble: false,
@@ -126,7 +137,11 @@
             if (this.banner.length > 1) this.bandSlide = (this.bandSlide + 1) % this.banner.length;
           }, 6000);
         }
-        const onScroll = () => { this.scrolled = window.scrollY > 520; };
+        const onScroll = () => {
+          this.scrolled = window.scrollY > 520;
+          const max = document.documentElement.scrollHeight - window.innerHeight;
+          this.dayP = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+        };
         window.addEventListener('scroll', onScroll, { passive: true });
         onScroll();
         // Arriving at the quote form from any "free quote" button gives it a little flash.
@@ -134,6 +149,7 @@
           const a = e.target.closest && e.target.closest('a[href="#contact"]');
           if (a) { this.wizFlash = false; setTimeout(() => { this.wizFlash = true; }, 450); setTimeout(() => { this.wizFlash = false; }, 2200); }
         });
+        this.fx();
         fetch('/api/public/site').then((r) => r.json()).then((d) => {
           this.company = d.company || {};
           if (d.calc) this.calc = d.calc;
@@ -152,6 +168,67 @@
             setTimeout(() => { this.waBubble = false; }, 21000);
           }
         }).catch(() => this.scheduleVideo());
+      },
+
+      // Scrolling the page = one solar day on a 5 kWp roof (about 20 kWh, sunrise 6 AM to sunset 6 PM).
+      get dayClock() {
+        const mins = Math.round((6 + this.dayP * 12) * 60);
+        const h = Math.floor(mins / 60);
+        const m = Math.floor((mins % 60) / 15) * 15;
+        return ((h % 12) || 12) + ':' + String(m).padStart(2, '0') + (h < 12 ? ' AM' : ' PM');
+      },
+      get dayKwh() { return (20 * (1 - Math.cos(Math.PI * this.dayP)) / 2).toFixed(1); },
+
+      // Playful extras: buttons lean toward the pointer, sunlight follows it across the hero,
+      // and the brand ribbons speed up while you scroll. All off with reduced motion.
+      fx() {
+        if (!this.motion) return;
+        const fine = window.matchMedia && window.matchMedia('(pointer: fine)').matches;
+        if (fine) {
+          let raf = 0;
+          let last = null;
+          document.addEventListener('pointermove', (e) => {
+            last = e;
+            if (raf) return;
+            raf = requestAnimationFrame(() => {
+              raf = 0;
+              document.querySelectorAll('.avn-magnet').forEach((el) => {
+                const r = el.getBoundingClientRect();
+                const dx = last.clientX - (r.left + r.width / 2);
+                const dy = last.clientY - (r.top + r.height / 2);
+                const d = Math.hypot(dx, dy);
+                const reach = Math.max(110, r.width);
+                if (d < reach) { const k = (1 - d / reach) * 0.32; el.style.translate = (dx * k).toFixed(1) + 'px ' + (dy * k).toFixed(1) + 'px'; } else if (el.style.translate) el.style.translate = '';
+              });
+            });
+          }, { passive: true });
+          const hero = this.$refs.hero;
+          if (hero) {
+            hero.addEventListener('pointermove', (e) => {
+              const r = hero.getBoundingClientRect();
+              hero.style.setProperty('--px', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+              hero.style.setProperty('--py', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+            }, { passive: true });
+          }
+        }
+        let lastY = window.scrollY;
+        let boost = 0;
+        let ticking = false;
+        const ribbons = () => [...document.querySelectorAll('.avn-marquee, .avn-marquee-rev')].flatMap((el) => (el.getAnimations ? el.getAnimations() : []));
+        window.addEventListener('scroll', () => {
+          boost = Math.min(5, boost + Math.abs(window.scrollY - lastY) / 45);
+          lastY = window.scrollY;
+          if (ticking) return;
+          ticking = true;
+          const tick = () => {
+            boost *= 0.93;
+            const list = ribbons();
+            list.forEach((a) => { a.playbackRate = 1 + boost; });
+            if (boost > 0.03) requestAnimationFrame(tick);
+            else { list.forEach((a) => { a.playbackRate = 1; }); ticking = false; }
+          };
+          requestAnimationFrame(tick);
+        }, { passive: true });
       },
 
       get heroHasVideo() { return !!(this.$refs.hero && this.$refs.hero.dataset.video); },

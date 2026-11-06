@@ -42,6 +42,11 @@
 @keyframes avn-wiz-in{from{opacity:0;transform:translateX(28px)}to{opacity:1;transform:none}}
 @keyframes avn-hero-par{to{transform:translateY(110px) scale(1.08)}}
 @keyframes avn-band{from{transform:translateY(-7%)}to{transform:translateY(7%)}}
+@keyframes avn-tilt{from{opacity:0;transform:perspective(1000px) rotateX(58deg) translateY(70px) scale(.92)}to{opacity:1;transform:none}}
+@keyframes avn-word-up{from{opacity:0;transform:translateY(.9em) rotate(7deg)}to{opacity:1;transform:none}}
+@keyframes avn-sunday{from{offset-distance:0%}to{offset-distance:100%}}
+@keyframes avn-sunday-sky{0%{background:rgba(255,236,214,.94)}30%,70%{background:rgba(255,255,255,.94)}100%{background:rgba(226,221,247,.94)}}
+@keyframes avn-sunday-col{0%,100%{background:#F26B1D}25%,75%{background:#FFC12E}}
 @keyframes avn-n-78{from{--avn-n:0}to{--avn-n:78}}
 @keyframes avn-n-4{from{--avn-n:0}to{--avn-n:4}}
 @keyframes avn-n-25{from{--avn-n:0}to{--avn-n:25}}
@@ -164,6 +169,10 @@
 .avn-rv-z{animation:avn-zoom linear both;animation-timeline:view();animation-range:entry 10% cover 35%}
 .avn-rv-wipe{animation:avn-wipe linear both;animation-timeline:view();animation-range:entry 20% cover 42%}
 .avn-rv-circle{animation:avn-circle linear both;animation-timeline:view();animation-range:entry 5% cover 45%}
+.avn-tilt{transform-origin:50% 100%;animation:avn-tilt linear both;animation-timeline:view();animation-range:entry 0% cover 35%}
+.avn-words .w{animation:avn-word-up linear both;animation-timeline:view();animation-range:entry calc(8% + var(--i) * 4%) cover calc(26% + var(--i) * 4%)}
+.sd-sun{animation:avn-sunday linear both,avn-sunday-col linear both;animation-timeline:scroll(root block),scroll(root block)}
+.sunday{animation:avn-sunday-sky linear both;animation-timeline:scroll(root block)}
 .avn-st-1{animation-range:entry 6% cover 34%}
 .avn-st-2{animation-range:entry 14% cover 38%}
 .avn-st-3{animation-range:entry 22% cover 42%}

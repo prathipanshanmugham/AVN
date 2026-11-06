@@ -49,6 +49,32 @@ const insAsset = db.prepare('INSERT INTO project_assets (project_id, kind, make,
 for (let i = 1; i <= 10; i++) insAsset.run(home, 'Module', 'Sample Solar', 'SS-540M', 'SSM2026' + String(4400 + i), owner);
 insAsset.run(home, 'Inverter', 'Sample Inverters', 'SI-5K', 'SI5K26A0091', owner);
 
+// Capacity / system type on the active projects, and finished sites for the CEO dashboard (sample values).
+const setCap = db.prepare('UPDATE projects SET capacity_kw = ?, system_type = ? WHERE id = ?');
+setCap.run(120, 'On-grid', projectIds[0]);
+setCap.run(5, 'On-grid', projectIds[1]);
+setCap.run(7.5, 'Off-grid', projectIds[2]);
+const finished = [
+  ['Sri Murugan Textiles', 'Tiruppur', 50, 'On-grid', 'Commercial rooftop', 24, -200],
+  ['Lakshmi Residence', 'Erode', 3, 'On-grid', 'Home rooftop', 1.9, -160],
+  ['Kongu Farms', 'Gobichettipalayam', 5, 'Off-grid', 'Solar pump', 3.2, -130],
+  ['Bhavani Rice Mill', 'Bhavani', 80, 'On-grid', 'Industrial rooftop', 38, -95],
+  ['Ravi Residence', 'Coimbatore', 5, 'Hybrid', 'Off-grid / hybrid', 4.6, -70],
+  ['Annai Hospital', 'Erode', 25, 'Hybrid', 'Commercial rooftop', 16, -40],
+  ['Selvam Residence', 'Salem', 3, 'On-grid', 'Home rooftop', 1.8, -20],
+  ['Perundurai Engineering', 'Perundurai', 100, 'On-grid', 'Industrial rooftop', 46, -8],
+];
+const insDone = db.prepare(`INSERT INTO projects (name, place, kwp, type, value_lakh, stage, pm_id, capacity_kw, system_type, completed_at, target_date, details)
+  VALUES (?,?,?,?,?,6,?,?,?,?,?,?)`);
+finished.forEach(([name, place, kw, sys, type, lakh, ago]) => {
+  const order = Math.round(lakh * 100000);
+  const id = insDone.run(name, place, kw + ' kWp', type, lakh, owner, kw, sys, day(ago), day(ago + 5),
+    JSON.stringify({ order_value: String(order), received: String(ago < -60 ? order : Math.round(order * 0.8)) })).lastInsertRowid;
+  createProjectTasks(id);
+  db.prepare('UPDATE project_tasks SET done = 1 WHERE project_id = ?').run(id);
+});
+db.prepare("UPDATE leads SET stage = 5, updated_at = datetime('now', '-20 days') WHERE name = 'Suresh Kumar'").run();
+
 const insEv = db.prepare('INSERT INTO events (title, type, date, time, who) VALUES (?,?,?,?,?)');
 [
   ['Karthik R — roof survey', 'visit', day(0), '11:00', 'Survey team'],
@@ -70,4 +96,4 @@ const insItem = db.prepare('INSERT INTO checklist_items (checklist_id, label, do
   items.forEach(([label, done], i) => insItem.run(id, label, done, i));
 });
 
-console.log('Demo data added: ' + leads.length + ' leads, ' + projects.length + ' projects, events and checklists.');
+console.log('Demo data added: ' + leads.length + ' leads, ' + (projects.length + finished.length) + ' projects, events and checklists.');

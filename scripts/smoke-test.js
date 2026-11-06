@@ -271,6 +271,25 @@ async function main() {
     r = await staff.req('GET', '/api/projects/' + projectId);
     ok(r.data.assets.length === 3 && r.data.project.details.net_meter_no === 'NM-77', 'project shows record and serials');
 
+    console.log('CEO dashboard & PDF reports');
+    r = await staff.req('PATCH', '/api/projects/' + projectId, { capacityKw: 5, systemType: 'Hybrid', stage: 6 });
+    ok(r.status === 200 && r.data.capacityKw === 5 && r.data.systemType === 'Hybrid' && /^\d{4}-\d{2}-\d{2}$/.test(r.data.completedAt), 'handover records capacity, system type and date');
+    r = await staff.req('PUT', '/api/projects/' + projectId + '/details', { order_value: '300000', received: '150000' });
+    r = await staff.req('GET', '/api/dashboard');
+    ok(r.status === 403, 'staff cannot open the CEO dashboard by default');
+    r = await admin.req('GET', '/api/dashboard?period=all');
+    ok(r.status === 200 && r.data.kpis.installedKwAll === 5 && r.data.bySystem.find((x) => x.system === 'Hybrid').installedKw === 5, 'dashboard counts kW installed by system type');
+    ok(r.data.byLocation.find((x) => x.place === 'Erode').total === 5 && typeof r.data.health.score === 'number' && r.data.health.parts.length === 6, 'kW per location and the health score');
+    for (const t of ['company', 'installations', 'sales', 'collections']) {
+      const res = await fetch(BASE + '/api/reports/' + t + '.pdf?period=this_fy', { headers: { Cookie: admin.cookie } });
+      const buf = Buffer.from(await res.arrayBuffer());
+      ok(res.status === 200 && res.headers.get('content-type') === 'application/pdf' && buf.slice(0, 5).toString() === '%PDF-' && buf.length > 5000, t + ' report downloads as PDF');
+    }
+    r = await admin.req('GET', '/admin');
+    ok(r.status === 302 && r.headers.get('location') === '/admin/dashboard', 'admins land on the dashboard');
+    r = await admin.req('GET', '/admin/dashboard');
+    ok(r.status === 200 && String(r.data).includes('x-data="dash"'), 'dashboard page opens for admin');
+
     console.log('Website photos & brand logos');
     const wide = await sharp({ create: { width: 2400, height: 900, channels: 3, background: '#2BA6E4' } }).jpeg().toBuffer();
     const bf = new FormData();

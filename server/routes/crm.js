@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, STAGES_LEAD, createProjectTasks } = require('../db');
+const { db, STAGES_LEAD, createProjectTasks, parseKw } = require('../db');
 const { requirePerm, can } = require('../auth');
 const { h, str, optStr, num, int, date, bad, notFound, forbidden, phone } = require('../util');
 
@@ -98,10 +98,15 @@ router.post('/leads/:id/convert', h((req, res) => {
   if (!l) throw notFound();
   if (l.project_id && db.prepare('SELECT 1 FROM projects WHERE id = ?').get(l.project_id)) throw bad('This lead already has a project');
   const typeMap = { Home: 'Home rooftop', Business: 'Commercial rooftop', Industry: 'Industrial rooftop', Farm: 'Solar pump' };
+  // Size and system type come from the accepted (or latest) quotation when there is one.
+  const quote = db.prepare("SELECT kwp, system_type, total FROM quotes WHERE lead_id = ? ORDER BY status = 'Accepted' DESC, id DESC LIMIT 1").get(l.id);
+  const capacity = quote && quote.kwp ? quote.kwp : parseKw(l.size);
+  const system = quote ? quote.system_type : (l.type === 'Farm' ? 'Off-grid' : 'On-grid');
+  const size = l.size || (capacity ? capacity + ' kWp' : null);
   let projectId;
   db.transaction(() => {
-    const info = db.prepare('INSERT INTO projects (name, lead_id, place, kwp, type, value_lakh, pm_id) VALUES (?,?,?,?,?,?,?)')
-      .run(l.name, l.id, l.place, l.size, typeMap[l.type] || l.type, l.value_lakh, l.owner_id || req.user.id);
+    const info = db.prepare('INSERT INTO projects (name, lead_id, place, kwp, type, value_lakh, pm_id, capacity_kw, system_type) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(l.name, l.id, l.place, size, typeMap[l.type] || l.type, l.value_lakh, l.owner_id || req.user.id, capacity, system);
     projectId = info.lastInsertRowid;
     createProjectTasks(projectId);
     db.prepare("UPDATE leads SET stage = 4, project_id = ?, updated_at = datetime('now') WHERE id = ?").run(projectId, l.id);

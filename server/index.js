@@ -84,6 +84,7 @@ app.use('/api', require('./routes/calendar'));
 app.use('/api', require('./routes/website'));
 app.use('/api', require('./routes/clients'));
 app.use('/api', require('./routes/quotes'));
+app.use('/api', require('./routes/dashboard'));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Private project documents: staff with Projects access, or the client who owns the project (if shared).
@@ -119,7 +120,7 @@ app.get(['/', '/index.html'], (req, res) => {
 
 // Staff back end pages
 const ADMIN_PAGES = {
-  crm: 'crm', quotes: 'quotes', 'quote-print': 'quotes', projects: 'projects', calendar: 'calendar', website: 'website', clients: 'clients',
+  dashboard: 'dashboard', crm: 'crm', quotes: 'quotes', 'quote-print': 'quotes', projects: 'projects', calendar: 'calendar', website: 'website', clients: 'clients',
   settings: null, account: null,
 };
 function firstAllowedPage(user) {

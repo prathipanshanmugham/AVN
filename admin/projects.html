@@ -36,7 +36,7 @@
       <template x-for="p in list" :key="p.id">
         <button type="button" class="item" :class="cur && cur.project.id === p.id && 'on'" @click="select(p.id)">
           <span class="row between" style="flex-wrap:nowrap;align-items:baseline"><b x-text="p.name"></b><span class="small" :style="late(p) ? 'color:var(--red-fg);font-weight:700' : 'color:var(--muted)'" x-text="dueText(p)"></span></span>
-          <span class="small muted" x-text="[p.place, p.kwp, p.type].filter(Boolean).join(' · ')"></span>
+          <span class="small muted" x-text="[p.place, sizeText(p), p.systemType].filter(Boolean).join(' · ')"></span>
           <span class="row" style="flex-wrap:nowrap"><span class="bar" style="flex:1"><span :style="'width:' + pct(p) + '%;' + (p.stage >= 6 ? 'background:var(--green)' : '')"></span></span><span class="badge" x-text="stageName(p.stage)"></span></span>
         </button>
       </template>
@@ -52,7 +52,7 @@
               <div>
                 <div class="eyebrow" x-text="cur.project.type || 'Project'"></div>
                 <h2 class="h2" x-text="cur.project.name"></h2>
-                <div class="muted" x-text="[cur.project.place, cur.project.kwp, AVN.money(cur.project.value)].filter(Boolean).join(' · ')"></div>
+                <div class="muted" x-text="[cur.project.place, sizeText(cur.project), cur.project.systemType, AVN.money(cur.project.value)].filter(Boolean).join(' · ')"></div>
               </div>
               <div class="row">
                 <a class="btn sm dark" x-show="cur.project.driveLink" :href="cur.project.driveLink" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7 A2 2 0 0 1 5 5 H10 L12 7 H19 A2 2 0 0 1 21 9 V17 A2 2 0 0 1 19 19 H5 A2 2 0 0 1 3 17 Z"/></svg>Project folder</a>
@@ -64,6 +64,7 @@
             <div class="row" style="gap:24px">
               <span><span class="small muted">Project manager</span><br><b x-text="cur.project.pmName || '—'"></b></span>
               <span><span class="small muted">Target date</span><br><b x-text="cur.project.targetDate ? AVN.date(cur.project.targetDate) : '—'"></b></span>
+              <span x-show="cur.project.completedAt"><span class="small muted">Handed over</span><br><b x-text="AVN.date(cur.project.completedAt)"></b></span>
               <span><span class="small muted">Client login</span><br><b x-text="cur.project.clientName ? cur.project.clientName + ' (' + cur.project.clientCode + ')' : 'Not linked'"></b></span>
               <span x-show="cur.quotes && cur.quotes.length"><span class="small muted">Quotations</span><br>
                 <template x-for="qt in cur.quotes" :key="qt.id"><a class="small" style="font-weight:700;margin-right:8px" :href="'/admin/quotes?id=' + qt.id" x-text="qt.number + ' · ' + AVN.inr(qt.total) + ' · ' + qt.status"></a></template></span>
@@ -177,7 +178,10 @@
       <div class="grid" style="--min:180px">
         <label class="field" style="grid-column:1/-1">Project name<input class="input" x-model="form.name" required></label>
         <label class="field">Place<input class="input" x-model="form.place"></label>
-        <label class="field">Size<input class="input" x-model="form.kwp" placeholder="5 kWp"></label>
+        <label class="field">Capacity (kWp) <small>counts on the CEO dashboard</small><input class="input" type="number" step="0.01" min="0" x-model="form.capacityKw" placeholder="5"></label>
+        <label class="field">System<select class="select" x-model="form.systemType"><template x-for="t in systemTypes" :key="t"><option :value="t" x-text="t" :selected="form.systemType === t"></option></template></select></label>
+        <label class="field">Size note <small>optional, e.g. 10 HP pump</small><input class="input" x-model="form.kwp"></label>
+        <label class="field" x-show="form.stage >= 6">Handed over on<input class="input" type="date" x-model="form.completedAt"></label>
         <label class="field">Type<select class="select" x-model="form.type"><template x-for="t in projectTypes" :key="t"><option :value="t" x-text="t"></option></template></select></label>
         <label class="field">Value (₹ lakh)<input class="input" type="number" step="0.1" min="0" x-model="form.value"></label>
         <label class="field">Project manager<select class="select" x-model="form.pmId"><option value="">—</option><template x-for="m in team" :key="m.id"><option :value="m.id" x-text="m.name"></option></template></select></label>

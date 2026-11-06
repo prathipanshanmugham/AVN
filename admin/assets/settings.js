@@ -71,6 +71,7 @@ document.addEventListener('alpine:init', () => {
     ],
     FORM_SECTIONS, testing: false,
     modules: [
+      { id: 'dashboard', name: 'CEO dashboard & reports', desc: 'Health score, kW installed, PDF reports — off for staff by default' },
       { id: 'crm', name: 'CRM', desc: 'Leads, pipeline, website enquiries' },
       { id: 'projects', name: 'Projects', desc: 'Stages, checklists, documents' },
       { id: 'calendar', name: 'Calendar', desc: 'Events, deadlines, checklists' },

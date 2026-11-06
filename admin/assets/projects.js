@@ -5,7 +5,7 @@ document.addEventListener('alpine:init', () => {
     projectTypes: ['Home rooftop', 'Commercial rooftop', 'Industrial rooftop', 'Ground-mount', 'Solar pump', 'Off-grid / hybrid', 'Care & AMC'],
     cur: null, view: null, newTask: '', docTitle: '', docVisible: true, uploading: false,
     formOpen: false, form: {}, error: '',
-    fields: [], assetKinds: [], group: 'site', det: {}, detDirty: false, savingDet: false,
+    fields: [], assetKinds: [], systemTypes: ['On-grid', 'Hybrid', 'Off-grid'], group: 'site', det: {}, detDirty: false, savingDet: false,
     af: { kind: 'Module', make: '', model: '', serials: '' }, addingAssets: false, allAssets: false, serialHits: [], searchTimer: null,
 
     async init() {
@@ -30,6 +30,7 @@ document.addEventListener('alpine:init', () => {
       this.stages = r.stages;
       this.projects = r.projects;
       this.assetKinds = r.assetKinds || [];
+      if (r.systemTypes) this.systemTypes = r.systemTypes;
       this.fields = (r.fields || []).map((g) => ({
         id: g.id, name: g.name,
         fields: g.fields.map(([key, label, type, options]) => ({ key, label, type: type || 'text', options: options || [] })),
@@ -96,6 +97,7 @@ document.addEventListener('alpine:init', () => {
       return this.projects.filter((p) => (this.tab === 'all' || (this.tab === 'active' ? p.stage < 6 : p.stage >= 6)) &&
         (!q || (p.name + ' ' + p.place + ' ' + p.clientName).toLowerCase().includes(q)));
     },
+    sizeText(p) { return p.capacityKw ? (Math.round(p.capacityKw * 100) / 100) + ' kWp' : (p.kwp || ''); },
     stageName(s) { return s >= 6 ? 'Handed over' : this.stages[s]; },
     pct(p) { return Math.round(Math.min(p.stage, 6) / 6 * 100); },
     late(p) { return p.stage < 6 && p.targetDate && AVN.daysFromToday(p.targetDate) < 0; },
@@ -180,14 +182,17 @@ document.addEventListener('alpine:init', () => {
     },
     openForm(p, focusDrive) {
       this.error = '';
-      this.form = p ? { id: p.id, name: p.name, place: p.place, kwp: p.kwp, type: p.type || 'Home rooftop', value: p.value ?? '', pmId: p.pmId || '', targetDate: p.targetDate, clientId: p.clientId || '', driveLink: p.driveLink || '' }
-        : { name: '', place: '', kwp: '', type: 'Home rooftop', value: '', pmId: '', targetDate: '', clientId: '', driveLink: '' };
+      this.form = p ? { id: p.id, name: p.name, place: p.place, kwp: p.kwp, type: p.type || 'Home rooftop', value: p.value ?? '', pmId: p.pmId || '', targetDate: p.targetDate, clientId: p.clientId || '', driveLink: p.driveLink || '',
+        capacityKw: p.capacityKw ?? '', systemType: p.systemType || 'On-grid', stage: p.stage, completedAt: p.completedAt || '' }
+        : { name: '', place: '', kwp: '', type: 'Home rooftop', value: '', pmId: '', targetDate: '', clientId: '', driveLink: '', capacityKw: '', systemType: 'On-grid', stage: 0, completedAt: '' };
       this.formOpen = true;
       if (focusDrive) this.$nextTick(() => this.$refs.drive && this.$refs.drive.focus());
     },
     async saveForm() {
       this.error = '';
-      const body = Object.assign({}, this.form, { pmId: this.form.pmId || null, clientId: this.form.clientId || null });
+      const body = Object.assign({}, this.form, { pmId: this.form.pmId || null, clientId: this.form.clientId || null, capacityKw: this.form.capacityKw === '' ? null : this.form.capacityKw });
+      delete body.stage;
+      if (!body.completedAt) delete body.completedAt;
       try {
         const saved = this.form.id ? await AVN.patch('/projects/' + this.form.id, body) : await AVN.post('/projects', body);
         this.formOpen = false;

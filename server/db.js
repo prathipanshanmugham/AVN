@@ -13,7 +13,10 @@ db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
 db.pragma('busy_timeout = 5000');
 
-const MODULES = ['crm', 'projects', 'calendar', 'website', 'clients', 'quotes'];
+// Order matters: the first module a user can open is their landing page (admins land on the dashboard).
+const MODULES = ['dashboard', 'crm', 'quotes', 'projects', 'calendar', 'website', 'clients'];
+const ADMIN_ONLY_BY_DEFAULT = ['website', 'dashboard'];
+const SYSTEM_TYPES = ['On-grid', 'Hybrid', 'Off-grid'];
 const STAGES_LEAD = ['New lead', 'Site survey', 'Quotation sent', 'Negotiation', 'Won', 'Lost'];
 const STAGES_PROJECT = ['Survey', 'Design', 'Procurement', 'Installation', 'Approvals', 'Switch-on'];
 const PROJECT_CHECKLISTS = [
@@ -352,7 +355,35 @@ const MIGRATIONS = [
       CREATE INDEX IF NOT EXISTS idx_quotes_lead ON quotes(lead_id);
     `);
   },
+  // 2 — CEO dashboard: numeric capacity, system type and completion date on projects
+  () => {
+    const cols = db.prepare('PRAGMA table_info(projects)').all().map((c) => c.name);
+    if (!cols.includes('capacity_kw')) db.exec('ALTER TABLE projects ADD COLUMN capacity_kw REAL');
+    if (!cols.includes('system_type')) db.exec("ALTER TABLE projects ADD COLUMN system_type TEXT NOT NULL DEFAULT 'On-grid'");
+    if (!cols.includes('completed_at')) db.exec('ALTER TABLE projects ADD COLUMN completed_at TEXT');
+    const up = db.prepare('UPDATE projects SET capacity_kw = ?, system_type = ?, completed_at = ? WHERE id = ?');
+    db.prepare('SELECT id, kwp, type, stage, updated_at FROM projects').all().forEach((p) => {
+      up.run(parseKw(p.kwp), guessSystem(p.type), p.stage >= 6 ? String(p.updated_at).slice(0, 10) : null, p.id);
+    });
+    db.exec('CREATE INDEX IF NOT EXISTS idx_projects_completed ON projects(completed_at)');
+  },
 ];
+
+/** "5 kWp", "120kW", "3.3" → number of kW. Pump ratings in HP are left for staff to fill in. */
+function parseKw(text) {
+  const s = String(text || '').trim();
+  const m = s.match(/([\d.]+)\s*(mwp|mw|kwp|kw)?/i);
+  if (!m || /hp/i.test(s)) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return /mw/i.test(m[2] || '') ? n * 1000 : n;
+}
+function guessSystem(type) {
+  const t = String(type || '').toLowerCase();
+  if (t.includes('hybrid')) return 'Hybrid';
+  if (t.includes('off-grid') || t.includes('pump')) return 'Off-grid';
+  return 'On-grid';
+}
 
 function migrate() {
   let version = db.pragma('user_version', { simple: true });
@@ -371,7 +402,7 @@ migrate();
 function seed() {
   const tx = db.transaction(() => {
     for (const m of MODULES) {
-      const allowed = m === 'website' ? 0 : 1; // new modules are added for existing installs too
+      const allowed = ADMIN_ONLY_BY_DEFAULT.includes(m) ? 0 : 1; // new modules are added for existing installs too
       db.prepare('INSERT OR IGNORE INTO permissions (module, staff_allowed) VALUES (?, ?)').run(m, allowed);
     }
     for (const [k, v] of Object.entries(SETTING_DEFAULTS)) {
@@ -442,6 +473,6 @@ function setSetting(key, value) {
 }
 
 module.exports = {
-  db, MODULES, STAGES_LEAD, STAGES_PROJECT, SETTING_DEFAULTS, PROJECT_FIELDS, ASSET_KINDS,
+  db, MODULES, STAGES_LEAD, STAGES_PROJECT, SETTING_DEFAULTS, PROJECT_FIELDS, ASSET_KINDS, SYSTEM_TYPES, parseKw, guessSystem,
   getSettings, setSetting, getPermissions, createProjectTasks,
 };
