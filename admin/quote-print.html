@@ -22,6 +22,7 @@
     <span class="seg" role="group" aria-label="Format" x-show="q">
       <template x-for="f in FORMATS" :key="f[0]"><button type="button" :class="view === f[0] && 'on'" :aria-pressed="view === f[0]" @click="setView(f[0])" x-text="f[1]"></button></template>
     </span>
+    <label class="tsw" x-show="q"><input type="checkbox" x-model="showSummary" @change="setSummary()"><span>Tax summary</span></label>
     <span class="hint">In the print window, choose <b>Save as PDF</b> to get a PDF.</span>
     <button type="button" @click="window.print()" :disabled="!q">Print / Save as PDF</button>
   </div>
@@ -131,7 +132,7 @@
         </table>
       </section>
 
-      <section class="taxsum">
+      <section class="taxsum" x-show="showSummary">
         <h3>Tax summary — HSN/SAC-wise</h3>
         <table class="hsn-table">
           <thead>

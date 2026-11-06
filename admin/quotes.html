@@ -169,6 +169,10 @@
               </div>
             </div>
 
+            <div class="rowline" style="min-height:44px;border:0;padding:0">
+              <span><b>Print the HSN/SAC tax summary</b><br><span class="small muted">The CGST / SGST or IGST totals always print; this adds the code-wise table.</span></span>
+              <button type="button" class="switch" role="switch" :aria-checked="(!!cur.taxSummary).toString()" aria-label="Print the HSN/SAC tax summary" @click="cur.taxSummary = !cur.taxSummary; dirty = true"></button>
+            </div>
             <details class="hsnsum">
               <summary>HSN/SAC-wise tax summary</summary>
               <div class="tablewrap">

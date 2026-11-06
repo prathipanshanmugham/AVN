@@ -243,6 +243,9 @@ async function main() {
     ok(r.status === 400, 'bad GSTIN rejected');
     r = await admin.req('PATCH', '/api/quotes/' + qt.id, { customerGstin: '', placeOfSupply: '33' });
     ok(r.status === 200 && r.data.interstate === false, 'back to CGST + SGST in Tamil Nadu');
+    ok(r.data.taxSummary === true, 'tax summary printed by default');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { taxSummary: false });
+    ok(r.status === 200 && r.data.taxSummary === false, 'tax summary can be switched off');
     {
       const QC = require('../admin/assets/quote-calc');
       const t = QC.totals({ taxMode: 'itemised', discount: 1000, items: [
@@ -270,6 +273,11 @@ async function main() {
     r = await admin.req('PUT', '/api/settings', { quote_components: JSON.stringify([{ key: 'modules', hsn: 'abc', gst: 5, share: 50 }]) });
     ok(r.status === 400, 'bad HSN in component settings rejected');
     r = await admin.req('PUT', '/api/settings', { quote_components: JSON.stringify([{ key: 'inverter', group: 'Inverter', desc: 'Solar inverter', hsn: '8504 40', gst: 18, share: 14 }]), quote_format: 'grouped' });
+    r = await admin.req('PUT', '/api/settings', { quote_tax_summary: '0' });
+    ok(r.status === 200 && r.data.quote_tax_summary === '0' && (await admin.req('POST', '/api/quotes', { customerName: 'No Summary', kwp: 2 })).data.taxSummary === false,
+      'new quotations follow the tax summary default');
+    await admin.req('PUT', '/api/settings', { quote_tax_summary: '1', quote_components: JSON.stringify([{ key: 'inverter', group: 'Inverter', desc: 'Solar inverter', hsn: '8504 40', gst: 18, share: 14 }]), quote_format: 'grouped' });
+    r = await admin.req('GET', '/api/settings');
     ok(r.status === 200 && JSON.parse(r.data.quote_components).find((c) => c.key === 'inverter').gst === 18 && JSON.parse(r.data.quote_components).length === 8 && r.data.quote_format === 'grouped', 'component GST and default format saved');
     r = await admin.req('PATCH', '/api/quotes/' + qt.id, { status: 'Accepted' });
     lead = (await admin.req('GET', '/api/leads/' + priya[0].id)).data;

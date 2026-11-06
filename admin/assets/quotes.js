@@ -108,7 +108,7 @@ document.addEventListener('alpine:init', () => {
         customerName: c.customerName, customerPhone: c.customerPhone, customerEmail: c.customerEmail, customerAddress: c.customerAddress,
         customerGstin: c.customerGstin, place: c.place, segment: c.segment, systemType: c.systemType, kwp: c.kwp, date: c.date,
         validUntil: c.validUntil, items: c.items, bom: c.bom, taxMode: c.taxMode, interstate: c.interstate, discount: c.discount,
-        subsidy: c.subsidy, notes: c.notes, terms: c.terms, status: c.status, format: c.format, placeOfSupply: c.placeOfSupply,
+        subsidy: c.subsidy, notes: c.notes, terms: c.terms, status: c.status, format: c.format, placeOfSupply: c.placeOfSupply, taxSummary: c.taxSummary,
       };
     },
     async save() {

@@ -89,6 +89,7 @@ const SETTING_DEFAULTS = {
   quote_validity: '15',
   quote_tax_mode: 'composite',
   quote_format: 'itemwise',
+  quote_tax_summary: '1',
   quote_hsn_system: '8541 43 00',
   quote_sac_install: '995461',
   quote_components: JSON.stringify(QUOTE_COMPONENTS),
@@ -407,6 +408,11 @@ const MIGRATIONS = [
     // Only replace the title and description if they were never changed.
     db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?').run(SITE_TITLE, 'site_title', OLD_SITE_TITLE);
     db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?').run(SITE_DESCRIPTION, 'site_description', OLD_SITE_DESCRIPTION);
+  },
+  // 4: the HSN/SAC tax summary can be left off a printed quotation.
+  () => {
+    const cols = db.prepare('PRAGMA table_info(quotes)').all().map((c) => c.name);
+    if (!cols.includes('tax_summary')) db.exec('ALTER TABLE quotes ADD COLUMN tax_summary INTEGER NOT NULL DEFAULT 1');
   },
 ];
 

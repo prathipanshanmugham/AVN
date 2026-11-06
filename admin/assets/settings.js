@@ -57,6 +57,7 @@ document.addEventListener('alpine:init', () => {
       { k: 'rate_offgrid', label: 'Off-grid rate (₹ per kWp)', hint: 'before GST', type: 'number' },
       { k: 'quote_tax_mode', label: 'GST on new quotations', type: 'select', options: [['composite', 'Solar EPC: 70% @ 5% + 30% @ 18% (≈ 8.9%)'], ['itemised', 'GST rate on each line']] },
       { k: 'quote_format', label: 'Format of new quotations', hint: 'can be switched on each quotation', type: 'select', options: [['itemwise', 'Item-wise — every line priced'], ['grouped', 'Grouped — one price per group']] },
+      { k: 'quote_tax_summary', label: 'Print the HSN/SAC tax summary', hint: 'default for new quotations — can be switched on each one', type: 'switch' },
       { k: 'quote_hsn_system', label: 'HSN for the 70% supply', hint: 'composite GST summary', ph: '8541 43 00' },
       { k: 'quote_sac_install', label: 'SAC for the 30% services', hint: 'composite GST summary', ph: '995461' },
       { k: 'quote_components', label: 'Component lines', type: 'components', wide: true },

@@ -155,7 +155,7 @@ const LABELS = {
   popup_delay: 'popup delay', quote_validity: 'quotation validity', quote_module_wp: 'module rating', smtp_port: 'SMTP port',
   rate_ongrid: 'on-grid rate', rate_hybrid: 'hybrid rate', rate_offgrid: 'off-grid rate',
 };
-const SWITCHES = ['video_fast_only', 'popup_enabled', 'smtp_secure'];
+const SWITCHES = ['video_fast_only', 'popup_enabled', 'smtp_secure', 'quote_tax_summary'];
 const LONG = { site_description: 400, address: 400, quote_terms: 3000, whatsapp_message: 300, quote_components: 4000, service_areas: 400 };
 const HSN_RE = /^[0-9][0-9 ]{3,11}$/;
 const SOCIAL = ['social_facebook', 'social_instagram', 'social_youtube', 'social_linkedin'];

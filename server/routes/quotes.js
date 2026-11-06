@@ -105,7 +105,7 @@ function quoteOut(q, full) {
   return Object.assign(out, {
     customerEmail: q.customer_email || '', customerAddress: q.customer_address || '', customerGstin: q.customer_gstin || '',
     items: parse(q.items), bom: parse(q.bom), taxMode: q.tax_mode, interstate: !!q.interstate,
-    format: FORMATS.includes(q.format) ? q.format : 'itemwise', placeOfSupply: q.place_of_supply || '',
+    format: FORMATS.includes(q.format) ? q.format : 'itemwise', placeOfSupply: q.place_of_supply || '', taxSummary: q.tax_summary !== 0,
     discount: q.discount, subsidy: q.subsidy, subtotal: q.subtotal, gst: q.gst, notes: q.notes || '', terms: q.terms || '',
   });
 }
@@ -176,15 +176,15 @@ router.post('/quotes', (req, res) => {
   let id;
   db.transaction(() => {
     id = db.prepare(`INSERT INTO quotes (number, lead_id, project_id, quote_date, valid_until, customer_name, customer_phone, customer_email, customer_address,
-      site_place, segment, system_type, kwp, items, bom, tax_mode, subsidy, terms, created_by, format, place_of_supply, interstate)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`).run(
+      site_place, segment, system_type, kwp, items, bom, tax_mode, subsidy, terms, created_by, format, place_of_supply, interstate, tax_summary)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`).run(
       nextNumber(s.quote_prefix || 'AVN-Q'), lead ? lead.id : null, lead && lead.project_id ? lead.project_id : null,
       istDate(), istDate(validity), name,
       optStr(pick('customerPhone', lead && lead.phone), 20), optStr(pick('customerEmail', lead && lead.email), 120),
       optStr(req.body.customerAddress, 400), optStr(pick('place', lead && lead.place), 80),
       segment, system, kwp, JSON.stringify(d.items), JSON.stringify(d.bom),
       s.quote_tax_mode === 'itemised' ? 'itemised' : 'composite', d.subsidy, s.quote_terms || '', req.user.id,
-      FORMATS.includes(s.quote_format) ? s.quote_format : 'itemwise', Q.companyState(s),
+      FORMATS.includes(s.quote_format) ? s.quote_format : 'itemwise', Q.companyState(s), s.quote_tax_summary === '0' ? 0 : 1,
     ).lastInsertRowid;
     saveTotals(id);
     if (lead) leadNote(lead.id, req.user.id, 'Quotation ' + db.prepare('SELECT number FROM quotes WHERE id = ?').get(id).number + ' created');
@@ -204,6 +204,7 @@ router.patch('/quotes/:id', (req, res) => {
     customer_gstin: has('customerGstin') ? optStr(String(b.customerGstin || '').replace(/\s+/g, '').toUpperCase(), 15) : q.customer_gstin,
     place_of_supply: has('placeOfSupply') ? (Q.stateName(String(b.placeOfSupply || '')) ? String(b.placeOfSupply) : null) : q.place_of_supply,
     format: has('format') ? (FORMATS.includes(b.format) ? b.format : 'itemwise') : q.format,
+    tax_summary: has('taxSummary') ? (bool(b.taxSummary) ? 1 : 0) : q.tax_summary,
     site_place: has('place') ? optStr(b.place, 80) : q.site_place,
     segment: has('segment') && SEGMENTS.includes(b.segment) ? b.segment : q.segment,
     system_type: has('systemType') && SYSTEMS.includes(b.systemType) ? b.systemType : q.system_type,
@@ -229,10 +230,10 @@ router.patch('/quotes/:id', (req, res) => {
   db.transaction(() => {
     db.prepare(`UPDATE quotes SET customer_name=?, customer_phone=?, customer_email=?, customer_address=?, customer_gstin=?, site_place=?, segment=?, system_type=?,
       kwp=?, quote_date=?, valid_until=?, items=?, bom=?, tax_mode=?, interstate=?, discount=?, subsidy=?, notes=?, terms=?, status=?, format=?, place_of_supply=?,
-      updated_at=datetime('now') WHERE id=?`)
+      tax_summary=?, updated_at=datetime('now') WHERE id=?`)
       .run(f.customer_name, f.customer_phone, f.customer_email, f.customer_address, f.customer_gstin, f.site_place, f.segment, f.system_type,
         f.kwp, f.quote_date, f.valid_until, f.items, f.bom, f.tax_mode, f.interstate, f.discount, f.subsidy, f.notes, f.terms, f.status,
-        f.format, f.place_of_supply, q.id);
+        f.format, f.place_of_supply, f.tax_summary, q.id);
     saveTotals(q.id);
     if (f.status !== q.status && q.lead_id) {
       const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(q.lead_id);
@@ -269,11 +270,11 @@ router.post('/quotes/:id/duplicate', (req, res) => {
   const q = load(req.params.id);
   const s = getSettings();
   const id = db.prepare(`INSERT INTO quotes (number, lead_id, project_id, quote_date, valid_until, customer_name, customer_phone, customer_email, customer_address, customer_gstin,
-    site_place, segment, system_type, kwp, items, bom, tax_mode, interstate, discount, subsidy, notes, terms, created_by, format, place_of_supply)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    site_place, segment, system_type, kwp, items, bom, tax_mode, interstate, discount, subsidy, notes, terms, created_by, format, place_of_supply, tax_summary)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     nextNumber(s.quote_prefix || 'AVN-Q'), q.lead_id, q.project_id, istDate(), istDate(parseInt(s.quote_validity, 10) || 15),
     q.customer_name, q.customer_phone, q.customer_email, q.customer_address, q.customer_gstin, q.site_place, q.segment, q.system_type, q.kwp,
-    q.items, q.bom, q.tax_mode, q.interstate, q.discount, q.subsidy, q.notes, q.terms, req.user.id, q.format, q.place_of_supply,
+    q.items, q.bom, q.tax_mode, q.interstate, q.discount, q.subsidy, q.notes, q.terms, req.user.id, q.format, q.place_of_supply, q.tax_summary,
   ).lastInsertRowid;
   saveTotals(id);
   if (q.lead_id) leadNote(q.lead_id, req.user.id, 'Revised quotation created from ' + q.number);

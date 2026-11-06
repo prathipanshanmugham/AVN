@@ -1,6 +1,6 @@
 document.addEventListener('alpine:init', () => {
   Alpine.data('printQuote', () => ({
-    q: null, cfg: {}, error: '', view: 'itemwise', FORMATS: QuoteCalc.FORMATS,
+    q: null, cfg: {}, error: '', view: 'itemwise', FORMATS: QuoteCalc.FORMATS, showSummary: true,
     async init() {
       await AVN.ready;
       const id = new URLSearchParams(location.search).get('id');
@@ -11,6 +11,8 @@ document.addEventListener('alpine:init', () => {
         this.q = q;
         const want = new URLSearchParams(location.search).get('format');
         this.view = QuoteCalc.FORMATS.some((f) => f[0] === want) ? want : (q.format || 'itemwise');
+        const sum = new URLSearchParams(location.search).get('summary');
+        this.showSummary = sum === '1' ? true : (sum === '0' ? false : q.taxSummary !== false);
         document.title = q.number + ' — ' + q.customerName;
         // On phones, show the A4 page scaled to fit, like a PDF preview.
         const fit = () => {
@@ -31,6 +33,11 @@ document.addEventListener('alpine:init', () => {
       return QuoteCalc.totals(q, { goodsHsn: this.cfg.quote_hsn_system, servicesSac: this.cfg.quote_sac_install });
     },
     get taxRows() { return this.t.taxLines.flatMap((l) => QuoteCalc.split(l, this.t.interstate)); },
+    setSummary() {
+      const u = new URL(location.href);
+      u.searchParams.set('summary', this.showSummary ? '1' : '0');
+      history.replaceState(null, '', u);
+    },
     setView(f) {
       this.view = f;
       const u = new URL(location.href);
