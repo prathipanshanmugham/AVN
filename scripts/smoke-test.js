@@ -85,6 +85,11 @@ async function main() {
     const anon = new Client();
     let r = await anon.req('GET', '/');
     ok(r.status === 200 && r.data.includes('<title>AVN Solar') && r.data.includes('/media/hero-default.mp4'), 'homepage renders with title and hero video');
+    ok(/\/assets\/site\.js\?v=[0-9a-f]{10}"/.test(r.data) && /\/assets\/site\.css\?v=/.test(r.data), 'scripts and styles carry a version so updates reach every browser');
+    r = await anon.req('GET', '/admin/login');
+    ok(r.status === 200 && /\/admin\/assets\/app\.js\?v=/.test(r.data), 'staff pages are versioned too');
+    r = await anon.req('GET', '/no-such-page');
+    ok(r.status === 404 && String(r.data).includes('site.css?v='), 'friendly 404 page');
     r = await anon.req('GET', '/api/public/site');
     ok(r.status === 200 && r.data.brands.modules.length === 8, 'site data has brands');
     r = await anon.req('POST', '/api/public/leads', { name: 'Web Visitor', phone: '98765 43210', district: 'Erode', type: 'Home', units: '600' });

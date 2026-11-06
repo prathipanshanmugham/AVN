@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const helmet = require('helmet');
 const compression = require('compression');
@@ -38,6 +39,29 @@ app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 const PUBLIC = path.join(config.root, 'public');
 const ADMIN = path.join(config.root, 'admin');
 const PORTAL = path.join(config.root, 'portal');
+
+/*
+ * Cache busting: every page links its scripts and styles as file.js?v=<hash of all asset files>,
+ * so after an update browsers fetch the new files instead of using week-old cached copies.
+ */
+function assetVersion() {
+  const hash = crypto.createHash('sha1');
+  [path.join(PUBLIC, 'assets'), path.join(ADMIN, 'assets'), path.join(PORTAL, 'assets')].forEach((dir) => {
+    fs.readdirSync(dir).filter((f) => /\.(js|css)$/.test(f)).sort().forEach((f) => hash.update(f).update(fs.readFileSync(path.join(dir, f))));
+  });
+  return hash.digest('hex').slice(0, 10);
+}
+const ASSET_V = assetVersion();
+const versioned = (html) => html.replace(/((?:src|href)="\/(?:admin\/assets|portal\/assets|assets)\/[^"?#]+\.(?:js|css))"/g, '$1?v=' + ASSET_V + '"');
+const pageCache = {};
+function sendPage(res, file, status = 200) {
+  let html = config.isProd ? pageCache[file] : null;
+  if (!html) {
+    html = versioned(fs.readFileSync(file, 'utf8'));
+    if (config.isProd) pageCache[file] = html;
+  }
+  res.status(status).type('html').send(html);
+}
 
 // Static files
 app.use('/assets', express.static(path.join(PUBLIC, 'assets'), { maxAge: config.isProd ? '7d' : 0 }));
@@ -79,7 +103,7 @@ app.get('/files/docs/:id', sessionMiddleware, (req, res) => {
 let indexTemplate = null;
 const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 app.get(['/', '/index.html'], (req, res) => {
-  if (!indexTemplate || !config.isProd) indexTemplate = fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8');
+  if (!indexTemplate || !config.isProd) indexTemplate = versioned(fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'));
   const s = require('./db').getSettings();
   const hero = db.prepare("SELECT * FROM media WHERE section = 'hero' AND visible = 1 AND status = 'ready' ORDER BY kind = 'video' DESC, position, id").all();
   const video = hero.find((m) => m.kind === 'video');
@@ -106,7 +130,7 @@ function firstAllowedPage(user) {
 app.get('/admin/login', sessionMiddleware, (req, res) => {
   const u = currentUser(req);
   if (u) return res.redirect(firstAllowedPage(u));
-  res.sendFile(path.join(ADMIN, 'login.html'));
+  sendPage(res, path.join(ADMIN, 'login.html'));
 });
 app.get(['/admin', '/admin/'], sessionMiddleware, (req, res) => {
   const u = currentUser(req);
@@ -121,21 +145,21 @@ app.get('/admin/:page', sessionMiddleware, (req, res, next) => {
   const mod = ADMIN_PAGES[page];
   if (mod && !can(u, mod)) return res.redirect(firstAllowedPage(u));
   res.set('Cache-Control', 'no-store');
-  res.sendFile(path.join(ADMIN, page + '.html'));
+  sendPage(res, path.join(ADMIN, page + '.html'));
 });
 
 // Client portal pages
 app.get('/portal/login', sessionMiddleware, (req, res) => {
   if (currentClient(req)) return res.redirect('/portal');
-  res.sendFile(path.join(PORTAL, 'login.html'));
+  sendPage(res, path.join(PORTAL, 'login.html'));
 });
 app.get(['/portal', '/portal/'], sessionMiddleware, (req, res) => {
   if (!currentClient(req)) return res.redirect('/portal/login');
   res.set('Cache-Control', 'no-store');
-  res.sendFile(path.join(PORTAL, 'index.html'));
+  sendPage(res, path.join(PORTAL, 'index.html'));
 });
 
-app.use((req, res) => res.status(404).sendFile(path.join(PUBLIC, '404.html')));
+app.use((req, res) => sendPage(res, path.join(PUBLIC, '404.html'), 404));
 
 // Errors
 app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
