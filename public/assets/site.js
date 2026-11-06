@@ -121,7 +121,7 @@
       popup: { enabled: false, delay: 25, title: '' },
       videoReady: false, lightbox: null, slide: 0, bandSlide: 0, wi: 0, scrolled: false,
       steps: STEPS, WIZ_TYPES, BILLS, ROOFS, heroWords: HERO_WORDS,
-      utm: {}, sending: false, leadSent: false, dayP: 0, menu: false, top: false, hideHead: false, menuLinks: MENU,
+      utm: {}, sending: false, leadSent: false, dayP: 0, menu: false, top: false, menuLinks: MENU,
       wiz: { step: 0, type: '', bill: '', billValue: 0, roof: '', name: '', phone: '', district: '', website: '' }, wizError: '', wizFlash: false,
       calcForm: { name: '', phone: '' }, calcError: '', calcSent: false,
       pop: { name: '', phone: '' }, popOpen: false, popSent: false, popError: '', waBubble: false,
@@ -139,13 +139,10 @@
             if (this.banner.length > 1) this.bandSlide = (this.bandSlide + 1) % this.banner.length;
           }, 6000);
         }
-        let lastY = window.scrollY;
         const onScroll = () => {
           const y = window.scrollY;
-          this.top = y > 12;
-          // Header tucks away while scrolling down, comes back on the way up.
-          if (Math.abs(y - lastY) > 6) { this.hideHead = y > lastY && y > 160; lastY = y; }
-          this.scrolled = y > 520;
+          if (this.top !== y > 8) this.top = y > 8; // header shadow only; the header itself never moves
+          if (this.scrolled !== y > 520) this.scrolled = y > 520;
           const max = document.documentElement.scrollHeight - window.innerHeight;
           this.dayP = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
         };

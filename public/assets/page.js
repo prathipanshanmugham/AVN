@@ -16,11 +16,14 @@ document.addEventListener('alpine:init', () => {
   }
 
   Alpine.data('page', () => ({
-    menu: false, sending: false, sent: false, error: '',
+    menu: false, scrolled: false, sending: false, sent: false, error: '',
     f: { name: '', phone: '', district: '', note: '', website: '' },
     init() {
       this.utm = readUtm();
       this.$watch('menu', (v) => document.documentElement.classList.toggle('menu-open', v));
+      const onScroll = () => { if (this.scrolled !== window.scrollY > 8) this.scrolled = window.scrollY > 8; };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
     },
     async send() {
       const phone = String(this.f.phone).replace(/\D/g, '').slice(-10);

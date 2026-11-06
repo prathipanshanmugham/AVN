@@ -180,7 +180,7 @@
 .avn-st-5{animation-range:entry 38% cover 50%}
 .avn-st-6{animation-range:entry 46% cover 54%}
 .avn-grow-rv{transform-origin:0 50%;animation:avn-grow linear both;animation-timeline:view();animation-range:entry 30% cover 50%}
-.avn-progress{animation:avn-grow linear both;animation-timeline:scroll(nearest block)}
+.avn-progress{animation:avn-grow linear both;animation-timeline:scroll(root block)}
 .hero-bg{animation:avn-hero-par linear both;animation-timeline:scroll(root block);animation-range:0px 900px}
 .avn-band-par{animation:avn-band linear both;animation-timeline:view();animation-range:cover 0% cover 100%}
 .avn-ring-out{animation:avn-ring-out linear both;animation-timeline:scroll(nearest block);animation-range:0px 900px}

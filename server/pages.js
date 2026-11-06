@@ -65,9 +65,10 @@ function serviceBody(s, svc) {
   const wa = digits(s.whatsapp || s.phone).length === 10;
   const others = SERVICES.filter((x) => x.slug !== svc.slug);
   const steps = STEPS.map(([t, d], i) => '<li><i>' + (i + 1) + '</i><div><b>' + esc(t) + '</b><span>' + esc(d) + '</span></div></li>').join('');
-  return `<header class="header">
+  return `<header class="header" :class="scrolled && 'scrolled'">
+  <div class="progress" aria-hidden="true"><div class="avn-progress"></div></div>
   <div class="wrap">
-    <a class="logo" href="/"><img src="/assets/logo.png" alt="${brand} logo" width="80" height="80"><b>${brand}</b></a>
+    <a class="logo" href="/"><img src="/assets/logo.png" alt="${brand} logo" width="64" height="64"><b>${brand}</b></a>
     <nav class="nav" aria-label="Main"><a class="avn-ul" href="/">Home</a>${serviceLinks(svc.slug)}</nav>
     <div class="header-actions">
       <a class="btn btn-accent btn-sm" href="#quote"><span class="cta-long">Get free quote</span><span class="cta-short">Free quote</span></a>

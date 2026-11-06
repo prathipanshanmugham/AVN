@@ -23,11 +23,10 @@ __SEO_HEAD__
 <body>
 <div class="avn" x-data="site" :class="!motion && 'avn-still'">
 
-<div class="progress-wrap" aria-hidden="true"><div class="avn-progress"></div></div>
-
-<header class="header" :class="{ compact: top, away: hideHead && !menu }">
+<header class="header" :class="top && 'scrolled'">
+  <div class="progress" aria-hidden="true"><div class="avn-progress"></div></div>
   <div class="wrap">
-    <a class="logo" href="/"><img src="/assets/logo.png" alt="AVN Solar logo" width="80" height="80"><b x-text="company.brand || 'AVN Solar'">AVN Solar</b></a>
+    <a class="logo" href="/"><img src="/assets/logo.png" alt="AVN Solar logo" width="64" height="64"><b x-text="company.brand || 'AVN Solar'">AVN Solar</b></a>
     <nav class="nav" aria-label="Main">
       <a class="avn-ul" href="#solutions">Solutions</a>
       <a class="avn-ul" href="#day">How solar works</a>
@@ -40,7 +39,7 @@ __SEO_HEAD__
         <button type="button" class="ta" :class="lang === 'ta' && 'on'" :aria-pressed="(lang === 'ta').toString()" @click="lang = 'ta'" lang="ta">தமிழ்</button>
       </div>
       <a class="btn btn-line btn-sm avn-btn" href="/portal/login"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/></svg>Customer login</a>
-      <a class="btn btn-accent btn-sm avn-shine avn-magnet" href="#contact"><span class="cta-long">Get free quote</span><span class="cta-short">Free quote</span></a>
+      <a class="btn btn-accent btn-sm" href="#contact"><span class="cta-long">Get free quote</span><span class="cta-short">Free quote</span></a>
       <button type="button" class="menu-btn" @click="menu = true" aria-label="Open menu" :aria-expanded="menu.toString()" aria-controls="msheet"><span></span><span></span><span></span></button>
     </div>
   </div>
