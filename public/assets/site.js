@@ -51,7 +51,15 @@
     { v: 'Open land', t: 'Open land', icon: IC.land },
     { v: 'Not sure', t: 'Not sure', icon: IC.unsure },
   ];
-  const HERO_WORDS = ['savings.', 'lower EB bills.', 'clean power.', 'energy freedom.'];
+  const HERO_WORDS = ['savings.', 'lower bills.', 'clean power.', 'real returns.'];
+  const MENU = [
+    { t: 'Solutions', ta: 'தீர்வுகள்', href: '#solutions' },
+    { t: 'How solar works', ta: 'சோலார் எப்படி வேலை செய்கிறது', href: '#day' },
+    { t: 'Savings calculator', ta: 'சேமிப்பு கணக்கீடு', href: '#calculator' },
+    { t: 'Recent projects', ta: 'எங்கள் திட்டங்கள்', href: '#projects' },
+    { t: 'Questions', ta: 'கேள்விகள்', href: '#faq' },
+    { t: 'Free quote', ta: 'இலவச விலைப்பட்டியல்', href: '#contact' },
+  ];
 
   const reducedMotion = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
   const store = {
@@ -119,7 +127,7 @@
       popup: { enabled: false, delay: 25, title: '' },
       videoReady: false, lightbox: null, slide: 0, bandSlide: 0, wi: 0, scrolled: false,
       steps: STEPS, faqs: FAQS, WIZ_TYPES, BILLS, ROOFS, heroWords: HERO_WORDS,
-      utm: {}, sending: false, leadSent: false, dayP: 0,
+      utm: {}, sending: false, leadSent: false, dayP: 0, menu: false, top: false, hideHead: false, menuLinks: MENU,
       wiz: { step: 0, type: '', bill: '', billValue: 0, roof: '', name: '', phone: '', district: '', website: '' }, wizError: '', wizFlash: false,
       calcForm: { name: '', phone: '' }, calcError: '', calcSent: false,
       pop: { name: '', phone: '' }, popOpen: false, popSent: false, popError: '', waBubble: false,
@@ -137,13 +145,19 @@
             if (this.banner.length > 1) this.bandSlide = (this.bandSlide + 1) % this.banner.length;
           }, 6000);
         }
+        let lastY = window.scrollY;
         const onScroll = () => {
-          this.scrolled = window.scrollY > 520;
+          const y = window.scrollY;
+          this.top = y > 12;
+          // Header tucks away while scrolling down, comes back on the way up.
+          if (Math.abs(y - lastY) > 6) { this.hideHead = y > lastY && y > 160; lastY = y; }
+          this.scrolled = y > 520;
           const max = document.documentElement.scrollHeight - window.innerHeight;
           this.dayP = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
         };
         window.addEventListener('scroll', onScroll, { passive: true });
         onScroll();
+        this.$watch('menu', (v) => document.documentElement.classList.toggle('menu-open', v));
         // Arriving at the quote form from any "free quote" button gives it a little flash.
         document.addEventListener('click', (e) => {
           const a = e.target.closest && e.target.closest('a[href="#contact"]');

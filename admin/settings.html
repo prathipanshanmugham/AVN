@@ -21,7 +21,7 @@
   </div>
 
   <div class="split">
-    <nav class="list card stack" style="flex:1 1 220px;padding:10px;gap:4px" aria-label="Settings sections">
+    <nav class="list card stack secnav" style="flex:1 1 220px;padding:10px;gap:4px" aria-label="Settings sections">
       <template x-for="s in visibleSections" :key="s.id">
         <button type="button" class="btn navbtn" :class="sec === s.id && 'on'" :aria-pressed="sec === s.id" @click="sec = s.id" x-text="s.name"></button>
       </template>
@@ -39,7 +39,7 @@
                 <div><b x-text="u.name"></b> <span class="badge" :class="u.role === 'admin' ? 'dark' : ''" x-text="u.role === 'admin' ? 'Admin' : 'Staff'"></span>
                   <span class="badge red" x-show="!u.active">Disabled</span><span class="badge amber" x-show="u.active && u.mustChange">Temporary password</span>
                   <div class="small muted" x-text="'@' + u.username + (u.email ? ' · ' + u.email : '') + ' · ' + (u.lastLogin ? 'last sign-in ' + AVN.when(u.lastLogin) : 'never signed in')"></div></div>
-                <div class="row"><button class="btn sm" type="button" @click="openUser(u)">Edit</button><button class="btn sm" type="button" @click="resetUser(u)">Reset password</button></div>
+                <div class="row actions"><button class="btn sm" type="button" @click="openUser(u)">Edit</button><button class="btn sm" type="button" @click="resetUser(u)">Reset password</button></div>
               </div>
             </template>
           </div>

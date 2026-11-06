@@ -10,7 +10,7 @@ document.addEventListener('alpine:init', () => {
     quotes: [], statuses: ['Draft', 'Sent', 'Accepted', 'Rejected'], q: '', status: 'All', loaded: false,
     segments: ['Home', 'Business', 'Industry', 'Farm'], systems: ['On-grid', 'Hybrid', 'Off-grid'], GST_RATES: QuoteCalc.GST_RATES,
     presets: PRESETS, cfg: {}, isAdmin: false,
-    cur: null, dirty: false, saving: false, creating: false, form: {}, error: '',
+    cur: null, detailOpen: false, dirty: false, saving: false, creating: false, form: {}, error: '',
 
     async init() {
       await AVN.ready;
@@ -21,7 +21,7 @@ document.addEventListener('alpine:init', () => {
       this.cfg = cfg;
       this.loaded = true;
       const id = new URLSearchParams(location.search).get('id');
-      if (id) await this.select(Number(id));
+      if (id) { await this.select(Number(id)); this.detailOpen = true; }
       else if (this.quotes[0]) await this.select(this.quotes[0].id);
       window.addEventListener('beforeunload', (e) => { if (this.dirty) { e.preventDefault(); e.returnValue = ''; } });
     },
@@ -61,6 +61,15 @@ document.addEventListener('alpine:init', () => {
       return 'https://wa.me/91' + this.waNumber + '?text=' + encodeURIComponent(lines.join('\n'));
     },
 
+    async open(id) {
+      await this.select(id);
+      if (this.cur && this.cur.id === id) { this.detailOpen = true; window.scrollTo({ top: 0, behavior: 'instant' }); }
+    },
+    back() {
+      if (this.dirty && !confirm('Discard unsaved changes to ' + this.cur.number + '?')) return;
+      if (this.dirty) { this.dirty = false; this.select(this.cur.id); }
+      this.detailOpen = false;
+    },
     async select(id) {
       if (this.dirty && this.cur && this.cur.id !== id && !confirm('Discard unsaved changes to ' + this.cur.number + '?')) return;
       try {
@@ -113,7 +122,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const copy = await AVN.post('/quotes/' + this.cur.id + '/duplicate');
         this.quotes.unshift(copy);
-        await this.select(copy.id);
+        await this.open(copy.id);
         AVN.toast('Revised copy ' + copy.number + ' created');
       } catch (e) { AVN.toast(e.message, true); }
     },
@@ -124,6 +133,7 @@ document.addEventListener('alpine:init', () => {
         this.quotes = this.quotes.filter((x) => x.id !== this.cur.id);
         this.cur = null;
         this.dirty = false;
+        this.detailOpen = false;
         history.replaceState(null, '', '/admin/quotes');
         AVN.toast('Quotation deleted');
       } catch (e) { AVN.toast(e.message, true); }
@@ -140,7 +150,7 @@ document.addEventListener('alpine:init', () => {
         this.creating = false;
         this.quotes.unshift(qte);
         this.dirty = false;
-        await this.select(qte.id);
+        await this.open(qte.id);
         AVN.toast('Quotation ' + qte.number + ' created');
       } catch (e) { this.error = e.message; }
     },

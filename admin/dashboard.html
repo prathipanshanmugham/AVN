@@ -98,7 +98,7 @@
               <div class="mcol" @mousemove="tip($event, monthName(m.month, true), [kw(m.kw) + ' · ' + m.projects + ' projects'].concat(systems.filter(t => m[t]).map(t => t + ': ' + kw(m[t]))))" @mouseleave="tipOff()">
                 <div class="mcol-bar"><i :style="'height:' + (anim ? (m.kw / monthMax * 100) : 0) + '%;transition-delay:' + (i * 40) + 'ms'"></i>
                   <b class="cap" x-show="m.kw && (m.kw === monthMax || i === d.monthly.length - 1)" :style="'bottom:calc(' + (m.kw / monthMax * 100) + '% + 4px)'" x-text="kwShort(m.kw)"></b></div>
-                <span class="mcol-label" x-text="monthName(m.month)"></span>
+                <span class="mcol-label" :class="i % 2 && 'odd'" x-text="monthName(m.month)"></span>
               </div>
             </template>
           </div>

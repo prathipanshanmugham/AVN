@@ -25,7 +25,7 @@
 
 <div class="progress-wrap" aria-hidden="true"><div class="avn-progress"></div></div>
 
-<header class="header">
+<header class="header" :class="{ compact: top, away: hideHead && !menu }">
   <div class="wrap">
     <a class="logo" href="/"><img src="/assets/logo.png" alt="AVN Solar logo" width="80" height="80"><b x-text="company.brand || 'AVN Solar'">AVN Solar</b></a>
     <nav class="nav" aria-label="Main">
@@ -41,9 +41,33 @@
       </div>
       <a class="btn btn-line btn-sm avn-btn" href="/portal/login"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/></svg>Customer login</a>
       <a class="btn btn-accent btn-sm avn-shine avn-magnet" href="#contact">Get free quote</a>
+      <button type="button" class="menu-btn" @click="menu = true" aria-label="Open menu" :aria-expanded="menu.toString()" aria-controls="msheet"><span></span><span></span><span></span></button>
     </div>
   </div>
 </header>
+
+<div class="msheet" id="msheet" x-show="menu" x-cloak x-transition.opacity.duration.250ms @keydown.escape.window="menu = false" role="dialog" aria-modal="true" aria-label="Menu">
+  <div class="msheet-panel" @click.outside="menu = false">
+    <div class="msheet-top">
+      <a class="logo" href="/" @click="menu = false"><img src="/assets/logo.png" alt="AVN Solar logo" width="52" height="52"><b x-text="company.brand || 'AVN Solar'">AVN Solar</b></a>
+      <button type="button" class="msheet-x" @click="menu = false" aria-label="Close menu">✕</button>
+    </div>
+    <nav class="msheet-nav" aria-label="Menu">
+      <template x-for="(l, i) in menuLinks" :key="l.href"><a :href="l.href" @click="menu = false" :style="'--d:' + (i * 45) + 'ms'"><span x-text="lang === 'ta' && l.ta ? l.ta : l.t"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg></a></template>
+    </nav>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" :class="lang === 'en' && 'on'" :aria-pressed="(lang === 'en').toString()" @click="lang = 'en'">English</button>
+      <button type="button" class="ta" :class="lang === 'ta' && 'on'" :aria-pressed="(lang === 'ta').toString()" @click="lang = 'ta'" lang="ta">தமிழ்</button>
+    </div>
+    <div class="msheet-actions">
+      <a class="btn btn-accent" href="#contact" @click="menu = false">Get my free quote</a>
+      <a class="btn btn-dark" x-show="company.phone" :href="'tel:+91' + digits(company.phone)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4 H9 L11 9 L8.5 10.5 A11 11 0 0 0 13.5 15.5 L15 13 L20 15 V19 A2 2 0 0 1 18 21 A16 16 0 0 1 3 6 A2 2 0 0 1 5 4"/></svg>Call us</a>
+      <a class="btn btn-wa" x-show="company.whatsapp" :href="waLink(company.whatsappMessage)" target="_blank" rel="noopener">WhatsApp</a>
+      <a class="btn btn-line" href="/portal/login"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/></svg>Customer login</a>
+    </div>
+    <a class="msheet-staff" href="/admin/login">Staff login</a>
+  </div>
+</div>
 
 <section id="top" class="hero">
   <div class="hero-card" data-video="__HERO_VIDEO__" x-ref="hero">

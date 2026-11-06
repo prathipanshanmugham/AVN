@@ -10,6 +10,17 @@ document.addEventListener('alpine:init', () => {
         this.cfg = cfg;
         this.q = q;
         document.title = q.number + ' — ' + q.customerName;
+        // On phones, show the A4 page scaled to fit, like a PDF preview.
+        const fit = () => {
+          const sheet = document.querySelector('.sheet');
+          if (!sheet) return;
+          // The wide page can stretch innerWidth on phones, so use the device width too.
+          const vw = Math.min(window.innerWidth, screen.width || Infinity, (window.visualViewport && window.visualViewport.width) || Infinity);
+          const z = (vw - 16) / 794;
+          sheet.style.zoom = z < 1 ? z.toFixed(3) : '';
+        };
+        this.$nextTick(fit);
+        window.addEventListener('resize', fit);
         if (new URLSearchParams(location.search).get('print') === '1') setTimeout(() => window.print(), 600);
       } catch (e) { this.error = e.message; }
     },

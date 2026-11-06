@@ -28,14 +28,14 @@
     <span x-show="!isAdmin">Ask an admin to add them in Settings, or type the price on each quotation.</span>
   </div>
 
-  <div class="split">
+  <div class="split md" :class="detailOpen && 'detail-open'">
     <div class="list stack">
       <label class="search" style="min-width:0"><span class="sr-only">Search quotations</span><input type="search" placeholder="Search name, number or place" x-model="q"></label>
       <div class="chips" role="group" aria-label="Filter by status">
         <template x-for="s in ['All'].concat(statuses)" :key="s"><button type="button" class="chip" :class="status === s && 'on'" :aria-pressed="status === s" @click="status = s" x-text="s"></button></template>
       </div>
       <template x-for="x in list" :key="x.id">
-        <button type="button" class="item" :class="cur && cur.id === x.id && 'on'" @click="select(x.id)">
+        <button type="button" class="item" :class="cur && cur.id === x.id && 'on'" @click="open(x.id)">
           <span class="row between" style="flex-wrap:nowrap;align-items:baseline"><b x-text="x.customerName"></b><b x-text="AVN.inr(x.total)"></b></span>
           <span class="small muted" x-text="[x.number, (x.kwp ? x.kwp + ' kWp ' + x.systemType : ''), x.place].filter(Boolean).join(' · ')"></span>
           <span class="row between small"><span class="muted" x-text="AVN.date(x.date)"></span><span class="badge" :class="badge(x)" x-text="statusLabel(x)"></span></span>
@@ -45,6 +45,7 @@
     </div>
 
     <section class="detail stack" aria-label="Quotation">
+      <button type="button" class="btn sm back-btn" style="align-self:flex-start" @click="back()">← All quotations</button>
       <template x-if="!cur"><div class="empty">Select a quotation, or create a new one.</div></template>
       <template x-if="cur">
         <form class="stack" style="gap:16px" @submit.prevent="save()" @input="dirty = true" @change="dirty = true">
@@ -99,9 +100,9 @@
             </div>
           </div>
 
-          <div class="card stack">
+          <div class="card stack qcard">
             <div class="row between"><h3>Price</h3>
-              <label class="field" style="flex-direction:row;align-items:center;gap:10px">GST
+              <label class="field gst-field" style="flex-direction:row;align-items:center;gap:10px">GST
                 <select class="select" style="width:auto" x-model="cur.taxMode"><option value="composite" :selected="cur.taxMode === 'composite'">Solar EPC: 70% @ 5% + 30% @ 18%</option><option value="itemised" :selected="cur.taxMode === 'itemised'">Rate on each line</option></select></label>
             </div>
             <div class="qtable" role="table" aria-label="Price lines">
@@ -146,7 +147,7 @@
             </div>
           </div>
 
-          <div class="card stack">
+          <div class="card stack qcard">
             <div class="row between"><h3>Scope of supply</h3><span class="small muted">Printed under the price, without amounts</span></div>
             <div class="qtable" role="table" aria-label="Scope of supply">
               <div class="brow qhead" role="row"><span role="columnheader">Item</span><span role="columnheader">Make / specification</span><span role="columnheader">Qty</span><span></span></div>

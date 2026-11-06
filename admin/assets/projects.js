@@ -5,7 +5,7 @@ document.addEventListener('alpine:init', () => {
     projectTypes: ['Home rooftop', 'Commercial rooftop', 'Industrial rooftop', 'Ground-mount', 'Solar pump', 'Off-grid / hybrid', 'Care & AMC'],
     cur: null, view: null, newTask: '', docTitle: '', docVisible: true, uploading: false,
     formOpen: false, form: {}, error: '',
-    fields: [], assetKinds: [], systemTypes: ['On-grid', 'Hybrid', 'Off-grid'], group: 'site', det: {}, detDirty: false, savingDet: false,
+    detailOpen: false, fields: [], assetKinds: [], systemTypes: ['On-grid', 'Hybrid', 'Off-grid'], group: 'site', det: {}, detDirty: false, savingDet: false,
     af: { kind: 'Module', make: '', model: '', serials: '' }, addingAssets: false, allAssets: false, serialHits: [], searchTimer: null,
 
     async init() {
@@ -113,6 +113,12 @@ document.addEventListener('alpine:init', () => {
     },
     get stageTasks() { return this.cur ? this.cur.tasks.filter((t) => t.stage === this.viewStage) : []; },
     get stageDone() { return this.stageTasks.filter((t) => t.done).length; },
+    // Phones show the list first; tapping a project opens its detail with a back button.
+    async open(id) {
+      await this.select(id);
+      this.detailOpen = true;
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    },
     async select(id) {
       if (this.detDirty && this.cur && this.cur.project.id !== id && !confirm('Discard unsaved project details?')) return;
       this.cur = await AVN.get('/projects/' + id);
@@ -176,6 +182,7 @@ document.addEventListener('alpine:init', () => {
       try {
         await AVN.del('/projects/' + this.cur.project.id);
         this.cur = null;
+        this.detailOpen = false;
         await this.load();
         AVN.toast('Project deleted');
       } catch (e) { AVN.toast(e.message, true); }
@@ -197,7 +204,7 @@ document.addEventListener('alpine:init', () => {
         const saved = this.form.id ? await AVN.patch('/projects/' + this.form.id, body) : await AVN.post('/projects', body);
         this.formOpen = false;
         await this.load();
-        await this.select(saved.id);
+        await this.open(saved.id);
         AVN.toast('Project saved');
       } catch (e) { this.error = e.message; }
     },

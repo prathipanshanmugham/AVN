@@ -22,7 +22,7 @@
   </div>
 
   <div class="split">
-    <nav class="list stack" aria-label="Website sections" style="flex:1 1 220px;gap:8px">
+    <nav class="list stack secnav" aria-label="Website sections" style="flex:1 1 220px;gap:8px">
       <template x-for="s in sections" :key="s.id">
         <button type="button" class="item" :class="sec === s.id && 'on'" :aria-pressed="sec === s.id" @click="sec = s.id; selId = null">
           <span class="row between"><b x-text="s.name"></b><span class="small muted" x-text="count(s.id)"></span></span>
@@ -40,6 +40,7 @@
       </div>
     </nav>
 
+    <p class="small muted mobile-only" style="margin:0;flex:1 1 100%" x-text="(sections.find(s => s.id === sec) || {}).desc"></p>
     <section class="detail stack" aria-label="Media" x-show="sec !== 'brands'">
       <div class="media-grid">
         <label class="drop" :class="hot && 'hot'" @dragover.prevent="hot = true" @dragleave="hot = false" @drop.prevent="hot = false; upload($event.dataTransfer.files)">

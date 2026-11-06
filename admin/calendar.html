@@ -23,7 +23,7 @@
   <div class="split">
     <section class="card stack detail" aria-label="Month" style="padding:16px">
       <div class="row between">
-        <div class="row">
+        <div class="row calhead" style="flex:1 1 300px;flex-wrap:nowrap">
           <button class="btn icon" type="button" @click="shift(-1)" aria-label="Previous month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 L9 12 L15 18"/></svg></button>
           <h2 class="h2" style="min-width:180px;text-align:center" x-text="monthLabel"></h2>
           <button class="btn icon" type="button" @click="shift(1)" aria-label="Next month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L15 12 L9 18"/></svg></button>

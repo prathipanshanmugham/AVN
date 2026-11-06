@@ -64,6 +64,13 @@ document.addEventListener('alpine:init', () => {
     pick(c) {
       this.selected = c.iso;
       if (!c.inMonth) { const d = new Date(c.iso + 'T00:00:00'); this.year = d.getFullYear(); this.month = d.getMonth(); this.loadEvents(); }
+      // On phones the day's plan sits below the month: bring it into view.
+      if (window.innerWidth <= 900) {
+        this.$nextTick(() => {
+          const el = document.querySelector('[aria-label="Selected day"]');
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
     },
     deadlineLabel(d) {
       const n = AVN.daysFromToday(d.date);

@@ -92,3 +92,15 @@ details summary::-webkit-details-marker{display:none}
 @media (prefers-reduced-motion:reduce){.meter>i,.mcol-bar>i,.hbar-fill{transition:none}}
 .viz .grid{grid-template-columns:repeat(auto-fit,minmax(min(var(--min,240px),100%),1fr))}
 .viz .parts{grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr))}
+
+@media (max-width:600px){
+  .mcol-label.odd{visibility:hidden}
+  .cols{padding-left:38px;height:200px}
+  .cols-grid{left:38px}
+  .hero{font-size:60px}
+  .health{padding:16px}
+  .report{flex-wrap:wrap}
+  .report .btn{width:100%}
+  .hbar{grid-template-columns:96px 1fr;gap:8px}
+  .hbar-label{font-size:13px}
+}

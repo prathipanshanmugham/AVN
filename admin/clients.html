@@ -22,7 +22,7 @@
   </div>
 
   <div class="row between">
-    <div class="tabs" style="min-width:300px" role="group" aria-label="View">
+    <div class="tabs" style="min-width:300px;flex:1 1 300px;max-width:440px" role="group" aria-label="View">
       <button type="button" :class="tab === 'logins' && 'on'" :aria-pressed="tab === 'logins'" @click="tab = 'logins'" x-text="'Logins (' + list.length + ')'"></button>
       <button type="button" :class="tab === 'requests' && 'on'" :aria-pressed="tab === 'requests'" @click="tab = 'requests'" x-text="'Requests (' + openRequests + ' open)'"></button>
     </div>
@@ -40,7 +40,7 @@
             <div class="small muted" x-text="'+91 ' + c.phone + (c.email ? ' · ' + c.email : '') + ' · ' + (c.projects.length ? c.projects.map(p => p.name).join(', ') : 'No project linked')"></div>
             <div class="small muted" x-text="c.lastLogin ? 'Last sign-in ' + AVN.when(c.lastLogin) : 'Never signed in'"></div>
           </div>
-          <div class="row" style="flex:none">
+          <div class="row actions">
             <button class="btn sm" type="button" @click="openEdit(c)">Edit</button>
             <button class="btn sm" type="button" @click="reset(c)">Reset password</button>
             <button class="btn sm" :class="c.active && 'danger'" type="button" @click="toggleActive(c)" x-text="c.active ? 'Disable' : 'Enable'"></button>

@@ -21,7 +21,7 @@
     <button class="btn primary" type="button" @click="openForm()"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>New project</button>
   </div>
 
-  <div class="split">
+  <div class="split md" :class="detailOpen && 'detail-open'">
     <div class="list stack">
       <div class="tabs" role="group" aria-label="Show">
         <template x-for="t in tabs" :key="t[0]"><button type="button" :class="tab === t[0] && 'on'" :aria-pressed="tab === t[0]" @click="tab = t[0]" x-text="t[1]"></button></template>
@@ -30,11 +30,11 @@
       <div class="card tight stack" style="gap:4px" x-show="serialHits.length">
         <div class="eyebrow" style="color:var(--muted)">Serial number matches</div>
         <template x-for="h in serialHits" :key="h.id">
-          <button type="button" class="rowline hit" @click="select(h.projectId)"><span><b class="mono" x-text="h.serial"></b><br><span class="small muted" x-text="[h.kind, h.make, h.model].filter(Boolean).join(' · ')"></span></span><span class="small" style="text-align:right" x-text="h.projectName"></span></button>
+          <button type="button" class="rowline hit" @click="open(h.projectId)"><span><b class="mono" x-text="h.serial"></b><br><span class="small muted" x-text="[h.kind, h.make, h.model].filter(Boolean).join(' · ')"></span></span><span class="small" style="text-align:right" x-text="h.projectName"></span></button>
         </template>
       </div>
       <template x-for="p in list" :key="p.id">
-        <button type="button" class="item" :class="cur && cur.project.id === p.id && 'on'" @click="select(p.id)">
+        <button type="button" class="item" :class="cur && cur.project.id === p.id && 'on'" @click="open(p.id)">
           <span class="row between" style="flex-wrap:nowrap;align-items:baseline"><b x-text="p.name"></b><span class="small" :style="late(p) ? 'color:var(--red-fg);font-weight:700' : 'color:var(--muted)'" x-text="dueText(p)"></span></span>
           <span class="small muted" x-text="[p.place, sizeText(p), p.systemType].filter(Boolean).join(' · ')"></span>
           <span class="row" style="flex-wrap:nowrap"><span class="bar" style="flex:1"><span :style="'width:' + pct(p) + '%;' + (p.stage >= 6 ? 'background:var(--green)' : '')"></span></span><span class="badge" x-text="stageName(p.stage)"></span></span>
@@ -44,6 +44,7 @@
     </div>
 
     <section class="detail stack" aria-label="Project details">
+      <button type="button" class="btn sm back-btn" style="align-self:flex-start" @click="detailOpen = false">← All projects</button>
       <template x-if="!cur"><div class="empty">Select a project to see its stages, checklist and documents.</div></template>
       <template x-if="cur">
         <div class="stack" style="gap:16px">

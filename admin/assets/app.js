@@ -10,7 +10,13 @@
     website: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15 L8 10 L13 15 L16 12 L21 17"/><circle cx="16" cy="8.5" r="1.5"/>',
     settings: '<path d="M4 6 H13 M17 6 H20 M4 12 H7 M11 12 H20 M4 18 H15 M19 18 H20"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
     account: '<circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/>',
+    more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+    menu: '<path d="M4 7 H20 M4 12 H20 M4 17 H14"/>',
+    close: '<path d="M6 6 L18 18 M18 6 L6 18"/>',
   };
+  const TITLES = { dashboard: 'CEO Dashboard', crm: 'CRM', quotes: 'Quotations', projects: 'Projects', calendar: 'Calendar', clients: 'Clients', website: 'Website', settings: 'Settings', account: 'My account' };
+  const SHORT = { dashboard: 'Dashboard', crm: 'CRM', quotes: 'Quotes', projects: 'Projects', calendar: 'Calendar', clients: 'Clients', website: 'Website', settings: 'Settings' };
+  const svg = (k) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[k] + '</svg>';
   const NAV = [
     { key: 'dashboard', label: 'CEO Dashboard', perm: 'dashboard' },
     { key: 'crm', label: 'CRM', perm: 'crm' },
@@ -23,12 +29,15 @@
   ];
   const page = location.pathname.split('/')[2] || '';
 
-  // Sidebar + toasts (static markup, processed by Alpine).
+  // Sidebar (a slide-in menu on phones), phone app bar + bottom tabs, toasts. Static markup, processed by Alpine.
   const side = document.getElementById('side');
   if (side) {
     side.className = 'side';
     side.setAttribute('x-data', '');
+    side.setAttribute(':class', "$store.app.menu && 'open'");
+    side.setAttribute('@keydown.escape.window', '$store.app.menu = false');
     side.innerHTML =
+      '<button type="button" class="side-close" aria-label="Close menu" @click="$store.app.menu = false">' + svg('close') + '</button>' +
       '<a class="brand" href="/admin"><span class="brand-logo"><img src="/assets/logo.png" alt=""></span><span><b>AVN Workspace</b><small>Solar EPC ERP</small></span></a>' +
       '<nav class="nav" aria-label="Workspace">' +
       NAV.map((n) => '<a href="/admin/' + n.key + '" class="' + (n.key === page ? 'on' : '') + '"' + (n.key === page ? ' aria-current="page"' : '') +
@@ -37,6 +46,28 @@
       '</nav>' +
       '<div class="me"><span class="avatar" x-text="$store.app.initials"></span><span><b x-text="$store.app.user.name"></b>' +
       '<span class="small" style="color:#A9B2D6" x-text="$store.app.user.role === \'admin\' ? \'Admin\' : \'Staff\'"></span> · <button type="button" @click="AVN.logout()">Sign out</button></span></div>';
+    side.insertAdjacentHTML('beforebegin',
+      '<header class="mtop" x-data>' +
+      '<button type="button" class="mtop-btn" aria-label="Open menu" @click="$store.app.menu = true">' + svg('menu') + '</button>' +
+      '<a class="mtop-brand" href="/admin"><img src="/assets/logo.png" alt=""><b>' + (TITLES[page] || 'AVN Workspace') + '</b></a>' +
+      '<button type="button" class="mtop-me" aria-label="Account and menu" @click="$store.app.menu = true"><span class="avatar" x-text="$store.app.initials"></span></button>' +
+      '</header>');
+    const scrim = document.createElement('div');
+    scrim.className = 'side-scrim';
+    scrim.setAttribute('x-data', '');
+    scrim.setAttribute(':class', "$store.app.menu && 'open'");
+    scrim.setAttribute('@click', '$store.app.menu = false');
+    document.body.appendChild(scrim);
+    // Bottom tabs: the first four sections this person can open, then "More" (the full menu).
+    const tabs = document.createElement('nav');
+    tabs.className = 'tabbar';
+    tabs.setAttribute('x-data', '');
+    tabs.setAttribute('aria-label', 'Quick sections');
+    tabs.innerHTML = NAV.filter((n) => n.perm).map((n) =>
+      '<a href="/admin/' + n.key + '" class="' + (n.key === page ? 'on' : '') + '" x-show="$store.app.tabs.includes(\'' + n.key + '\')" x-cloak' + (n.key === page ? ' aria-current="page"' : '') + '>' +
+      '<span class="ti">' + svg(n.key) + '</span>' + SHORT[n.key] + '</a>').join('') +
+      '<button type="button" :class="!$store.app.tabs.includes(\'' + page + '\') && \'on\'" @click="$store.app.menu = true"><span class="ti">' + svg('more') + '</span>More</button>';
+    document.body.appendChild(tabs);
     const toasts = document.createElement('div');
     toasts.className = 'toasts';
     toasts.setAttribute('x-data', '');
@@ -127,7 +158,10 @@
 
   document.addEventListener('alpine:init', () => {
     Alpine.store('app', {
-      user: { name: '', role: '' }, perms: {}, toasts: [], initials: '',
+      user: { name: '', role: '' }, perms: {}, toasts: [], initials: '', tabs: [],
+      _menu: false,
+      get menu() { return this._menu; },
+      set menu(v) { this._menu = !!v; document.documentElement.classList.toggle('menu-open', !!v); },
     });
     if (page === 'login') { readyResolve(null); return; }
     api('GET', '/auth/me').then((me) => {
@@ -135,8 +169,13 @@
       const s = Alpine.store('app');
       s.user = me.user;
       s.perms = me.permissions;
+      s.tabs = NAV.filter((n) => n.perm && me.permissions[n.perm]).slice(0, 4).map((n) => n.key);
       s.initials = me.user.name.split(/\s+/).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
       readyResolve(me);
+      setTimeout(() => document.querySelectorAll('.secnav').forEach((nav) => {
+        const on = nav.querySelector('.on');
+        if (on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = on.offsetLeft - 14;
+      }), 300);
     }).catch(() => {});
   });
 })();
