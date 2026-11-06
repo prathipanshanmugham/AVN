@@ -90,6 +90,16 @@ app.get('/favicon.ico', (req, res) => {
   res.sendFile(path.join(PUBLIC, 'favicon.ico'));
 });
 
+// Addresses from the old WordPress site, still in Google: send them to the matching part of the new site
+// (301), and tell search engines the WordPress filler pages are gone for good (410).
+const OLD_PAGES = { about: '/#why', services: '/#solutions', contact: '/#contact', project: '/#projects', projects: '/#projects' };
+app.get(/^\/(about|services|contact|projects?)\/?$/, (req, res) => res.redirect(301, OLD_PAGES[req.params[0]]));
+app.get(/^\/(sitemap_index|page-sitemap|post-sitemap|category-sitemap|author-sitemap)\.xml$/, (req, res) => res.redirect(301, '/sitemap.xml'));
+app.get(/^\/(sample-page|hello-world|feed|comments\/feed|author\/[^/]+|category\/[^/]+)\/?$/, (req, res) => {
+  res.status(410);
+  sendPage(res, path.join(PUBLIC, '404.html'), 410);
+});
+
 // Search engines: robots, sitemap, web app manifest (all follow the website address in Settings)
 const seo = require('./seo');
 const pages = require('./pages');

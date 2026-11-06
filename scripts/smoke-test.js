@@ -396,6 +396,12 @@ async function main() {
       require('http').get({ host: '127.0.0.1', port: PORT, path: '/solar-water-pumps?x=1', headers: { Host: 'www.avnsolar.in' } }, (res) => { res.resume(); resolve(res); });
     });
     ok(www.statusCode === 301 && www.headers.location === 'https://avnsolar.in/solar-water-pumps?x=1', 'www redirects to the main address');
+    r = await anon.req('GET', '/about/');
+    let r2 = await anon.req('GET', '/contact');
+    let r3 = await anon.req('GET', '/sitemap_index.xml');
+    let r4 = await anon.req('GET', '/hello-world/');
+    ok(r.status === 301 && r.headers.get('location') === '/#why' && r2.headers.get('location') === '/#contact' && r3.headers.get('location') === '/sitemap.xml' && r4.status === 410,
+      'old WordPress addresses redirect (filler pages gone)');
     r = await admin.req('PUT', '/api/settings', { site_url: 'avnsolar' });
     ok(r.status === 400, 'bad website address rejected');
     r = await admin.req('PUT', '/api/settings', { google_verification: '<meta name="google-site-verification" content="abcDEF123_-xyz789" />', ga_id: 'G-TEST1234', service_areas: 'Tamil Nadu,  Tiruppur ,Erode', social_instagram: 'javascript:alert(1)' });
