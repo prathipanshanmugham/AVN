@@ -5,4 +5,4 @@ cd /var/www/avn
 sudo -u avn git pull --ff-only
 sudo -u avn npm ci --omit=dev
 sudo -u avn pm2 reload avn
-echo "Updated to $(git log -1 --format='%h %s')"
+echo "Updated to $(sudo -u avn git log -1 --format="%h %s")"
