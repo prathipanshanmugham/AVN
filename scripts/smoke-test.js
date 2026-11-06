@@ -228,18 +228,49 @@ async function main() {
     r = await admin.req('POST', '/api/quotes', { leadId: priya[0].id });
     ok(r.status === 201 && /^AVN-Q\/\d{2}-\d{2}\/0001$/.test(r.data.number), 'quotation numbered per financial year');
     const qt = r.data;
-    ok(qt.customerName === 'Priya Natarajan' && qt.kwp === 3 && qt.items[0].rate === 60000 && qt.subsidy === 78000, 'filled from the lead, rates and PM Surya Ghar subsidy');
+    const lineSum = (items) => items.reduce((a, it) => a + it.qty * it.rate, 0);
+    ok(qt.customerName === 'Priya Natarajan' && qt.kwp === 3 && lineSum(qt.items) === 180000 && qt.subsidy === 78000, 'filled from the lead, rates and PM Surya Ghar subsidy');
+    ok(qt.items.length === 7 && qt.items[0].hsn === '8541 43 00' && qt.items[0].qty === 6 && qt.items[0].group === 'Solar PV modules' &&
+      qt.items.some((it) => it.hsn === '995461' && it.gst === 18) && !qt.items.some((it) => /battery/i.test(it.desc)), 'component lines with HSN/SAC and GST (no battery on-grid)');
+    ok(qt.format === 'itemwise' && qt.placeOfSupply === '33', 'item-wise by default, place of supply Tamil Nadu');
     ok(qt.bom.some((b) => b.item === 'Solar PV modules' && b.qty === '6 Nos' && b.spec.includes('TestModules')), 'scope of supply counts the panels');
     ok(qt.total === Math.round(180000 * 1.089), 'composite GST: 70% @ 5% + 30% @ 18%');
-    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { taxMode: 'itemised', items: [{ desc: 'Modules', qty: 1, rate: 100000, gst: 5 }, { desc: 'Installation', qty: 1, rate: 20000, gst: 18 }], discount: 0 });
-    ok(r.status === 200 && r.data.total === 128600, 'itemised GST totals');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { taxMode: 'itemised', items: [{ group: 'Supply', desc: 'Modules', hsn: '8541 43 00', qty: 1, rate: 100000, gst: 5 }, { group: 'Services', desc: 'Installation', hsn: '995461', qty: 1, rate: 20000, gst: 18 }], discount: 0 });
+    ok(r.status === 200 && r.data.total === 128600 && r.data.items[0].group === 'Supply', 'itemised GST totals; groups kept');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { format: 'grouped', customerGstin: '29abcde1234f1z5', placeOfSupply: '29' });
+    ok(r.status === 200 && r.data.format === 'grouped' && r.data.customerGstin === '29ABCDE1234F1Z5' && r.data.interstate === true, 'grouped format; other-state place of supply means IGST');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { customerGstin: 'NOT-A-GSTIN' });
+    ok(r.status === 400, 'bad GSTIN rejected');
+    r = await admin.req('PATCH', '/api/quotes/' + qt.id, { customerGstin: '', placeOfSupply: '33' });
+    ok(r.status === 200 && r.data.interstate === false, 'back to CGST + SGST in Tamil Nadu');
+    {
+      const QC = require('../admin/assets/quote-calc');
+      const t = QC.totals({ taxMode: 'itemised', discount: 1000, items: [
+        { group: 'Modules', desc: 'A', hsn: '8541', qty: 2, rate: 5000, gst: 5 }, { group: 'Modules', desc: 'B', hsn: '8541', qty: 1, rate: 3000, gst: 5 },
+        { group: 'Services', desc: 'C', hsn: '995461', qty: 1, rate: 7000, gst: 18 }] });
+      const taxableSum = t.items.reduce((a, it) => a + it.taxable, 0);
+      const hsnTax = t.hsn.reduce((a, h) => a + h.amount, 0);
+      ok(Math.abs(taxableSum - 19000) < 0.001 && t.groups.length === 2 && t.groups[0].items.length === 2 && t.hsn.length === 2 &&
+        Math.abs(hsnTax - t.gst) < 0.001 && Math.abs(t.cgst + t.sgst - t.gst) < 0.001, 'discount shared across lines; groups and HSN summary add up');
+      const c = QC.totals({ taxMode: 'composite', interstate: true, items: [{ desc: 'x', qty: 1, rate: 100000 }] }, { goodsHsn: '8541 43 00', servicesSac: '995461' });
+      ok(c.igst === 8900 && c.cgst === 0 && c.hsn[0].hsn === '8541 43 00' && c.hsn[1].hsn === '995461' && c.effectiveRate === 8.9, 'composite summary: 70/30 legs with HSN/SAC, IGST');
+      ok(QC.words(1234.5, true) === 'Rupees One Thousand Two Hundred Thirty Four and Fifty Paise Only', 'amount in words with paise');
+    }
     r = await admin.req('PATCH', '/api/quotes/' + qt.id, { status: 'Sent' });
     let lead = (await admin.req('GET', '/api/leads/' + priya[0].id)).data;
     ok(lead.lead.stage === 2 && lead.quotes.length === 1, 'sending moves the lead to "Quotation sent"');
     r = await admin.req('POST', '/api/quotes/' + qt.id + '/duplicate');
     ok(r.status === 201 && r.data.number.endsWith('/0002') && r.data.status === 'Draft', 'revised copy gets the next number');
     r = await admin.req('POST', '/api/quotes/' + r.data.id + '/refill');
-    ok(r.status === 200 && r.data.items.length === 1 && r.data.items[0].rate === 60000, 'refill rebuilds lines from rates');
+    ok(r.status === 200 && r.data.items.length === 7 && lineSum(r.data.items) === 180000, 'refill rebuilds lines from rates');
+    r = await admin.req('PATCH', '/api/quotes/' + r.data.id, { systemType: 'Hybrid' });
+    await admin.req('PUT', '/api/settings', { rate_hybrid: '90000' });
+    r = await admin.req('POST', '/api/quotes/' + r.data.id + '/refill');
+    ok(r.status === 200 && r.data.items.some((it) => it.hsn === '8507') && lineSum(r.data.items) === 270000, 'hybrid adds a battery line; total still exact');
+    r = await admin.req('PUT', '/api/settings', { quote_components: JSON.stringify([{ key: 'modules', hsn: 'abc', gst: 5, share: 50 }]) });
+    ok(r.status === 400, 'bad HSN in component settings rejected');
+    r = await admin.req('PUT', '/api/settings', { quote_components: JSON.stringify([{ key: 'inverter', group: 'Inverter', desc: 'Solar inverter', hsn: '8504 40', gst: 18, share: 14 }]), quote_format: 'grouped' });
+    ok(r.status === 200 && JSON.parse(r.data.quote_components).find((c) => c.key === 'inverter').gst === 18 && JSON.parse(r.data.quote_components).length === 8 && r.data.quote_format === 'grouped', 'component GST and default format saved');
     r = await admin.req('PATCH', '/api/quotes/' + qt.id, { status: 'Accepted' });
     lead = (await admin.req('GET', '/api/leads/' + priya[0].id)).data;
     ok(lead.lead.stage === 4 && lead.lead.value === 1.29, 'accepting marks the lead won with the order value');
@@ -319,6 +350,55 @@ async function main() {
     ok(r.status === 200 && r.data.name === 'Sungrow' && /\.webp$/.test(r.data.logo), 'logo file matched to its brand by name; SVG rasterised');
     r = await anon.req('GET', '/api/public/site');
     ok(r.data.brands.modules.find((b) => b.name === 'Waaree').logo && r.data.banner.length === 1 && r.data.company.whatsappMessage, 'logos, photo band and WhatsApp text on the public site');
+
+    console.log('Search engines (SEO)');
+    r = await anon.req('GET', '/robots.txt');
+    ok(r.status === 200 && /Sitemap: https:\/\/avnsolar\.in\/sitemap\.xml/.test(r.data) && /Disallow: \/admin/.test(r.data), 'robots.txt points to the sitemap, hides the back end');
+    r = await anon.req('GET', '/sitemap.xml');
+    ok(r.status === 200 && (String(r.data).match(/<loc>/g) || []).length === 5 && String(r.data).includes('https://avnsolar.in/rooftop-solar-for-homes'), 'sitemap lists the homepage and service pages');
+    r = await anon.req('GET', '/');
+    const home = String(r.data);
+    const ldOf = (html) => { const m = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/); return m ? JSON.parse(m[1]) : null; };
+    const homeLd = ldOf(home);
+    const types = homeLd ? homeLd['@graph'].map((n) => n['@type']) : [];
+    ok(home.includes('<link rel="canonical" href="https://avnsolar.in/">') && home.includes('og:image" content="https://avnsolar.in/assets/og-image.jpg"') && home.includes('lang="en-IN"'),
+      'homepage: canonical, absolute share image, language');
+    ok(types.includes('HomeAndConstructionBusiness') && types.includes('WebSite') && types.includes('FAQPage'), 'homepage structured data: business, website, FAQ');
+    ok((home.match(/<details class="faq-item"/g) || []).length >= 8 && !home.includes('__FAQ_HTML__') && !home.includes('__FOOTER__') && home.includes('href="/solar-water-pumps"'),
+      'FAQ and footer links rendered on the server');
+    ok(!home.includes('googletagmanager.com/gtag') && /script-src[^;]*googletagmanager/.test(r.headers.get('content-security-policy')), 'no analytics until an ID is set; CSP ready for it');
+    r = await anon.req('GET', '/rooftop-solar-for-homes');
+    const svc = String(r.data);
+    const svcTypes = (ldOf(svc) || { '@graph': [] })['@graph'].map((n) => n['@type']);
+    ok(r.status === 200 && /<h1>Rooftop solar for your home/.test(svc) && svc.includes('₹78,000') && svc.includes('rel="canonical" href="https://avnsolar.in/rooftop-solar-for-homes"') &&
+      svcTypes.includes('Service') && svcTypes.includes('BreadcrumbList'), 'service page: content, canonical, Service + breadcrumb data');
+    for (const slug of ['commercial-industrial-solar', 'solar-water-pumps', 'solar-maintenance-amc']) {
+      r = await anon.req('GET', '/' + slug);
+      ok(r.status === 200 && String(r.data).includes('id="quote"') && !/__[A-Z_]+__/.test(String(r.data)), '/' + slug + ' renders with a quote form');
+    }
+    r = await anon.req('POST', '/api/public/leads', { form: 'contact', type: 'Farm', name: 'Murugan K', phone: '9003311223', district: 'Gobi', note: 'Borewell 400 ft', page: '/solar-water-pumps' });
+    ok(r.status === 201, 'service page quote form creates a lead');
+    r = await anon.req('GET', '/favicon.ico');
+    ok(r.status === 200 && /icon/.test(r.headers.get('content-type')), 'favicon.ico served');
+    r = await anon.req('GET', '/site.webmanifest');
+    ok(r.status === 200 && r.data.icons.length === 3 && r.data.short_name === 'AVN Solar', 'web app manifest with icons');
+    r = await anon.req('GET', '/icons/apple-touch-icon.png');
+    ok(r.status === 200, 'apple touch icon served');
+    const www = await new Promise((resolve) => {
+      require('http').get({ host: '127.0.0.1', port: PORT, path: '/solar-water-pumps?x=1', headers: { Host: 'www.avnsolar.in' } }, (res) => { res.resume(); resolve(res); });
+    });
+    ok(www.statusCode === 301 && www.headers.location === 'https://avnsolar.in/solar-water-pumps?x=1', 'www redirects to the main address');
+    r = await admin.req('PUT', '/api/settings', { site_url: 'avnsolar' });
+    ok(r.status === 400, 'bad website address rejected');
+    r = await admin.req('PUT', '/api/settings', { google_verification: '<meta name="google-site-verification" content="abcDEF123_-xyz789" />', ga_id: 'G-TEST1234', service_areas: 'Tamil Nadu,  Tiruppur ,Erode', social_instagram: 'javascript:alert(1)' });
+    ok(r.status === 400, 'non-web social link rejected');
+    r = await admin.req('PUT', '/api/settings', { google_verification: '<meta name="google-site-verification" content="abcDEF123_-xyz789" />', ga_id: 'G-TEST1234', service_areas: 'Tamil Nadu,  Tiruppur ,Erode' });
+    ok(r.status === 200 && r.data.google_verification === 'abcDEF123_-xyz789' && r.data.service_areas === 'Tamil Nadu, Tiruppur, Erode', 'verification code taken from the pasted tag; areas tidied');
+    r = await anon.req('GET', '/');
+    ok(String(r.data).includes('<meta name="google-site-verification" content="abcDEF123_-xyz789">') && String(r.data).includes('gtag/js?id=G-TEST1234') &&
+      ldOf(String(r.data))['@graph'][0].areaServed.length === 3, 'verification, Analytics and service areas on the homepage');
+    r = await anon.req('GET', '/assets/ga.js');
+    ok(r.status === 200, 'Analytics loader served from a file (no inline script)');
 
     console.log('Admin sign-in from the server shell');
     const env = Object.assign({}, process.env, { DATA_DIR: path.join(tmp, 'data'), UPLOAD_DIR: path.join(tmp, 'uploads'), NODE_ENV: 'test' });

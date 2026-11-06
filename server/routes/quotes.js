@@ -1,5 +1,5 @@
 const express = require('express');
-const { db, getSettings, STAGES_LEAD } = require('../db');
+const { db, getSettings, STAGES_LEAD, QUOTE_COMPONENTS } = require('../db');
 const { requirePerm } = require('../auth');
 const { str, optStr, num, int, date, bool, email, bad, notFound } = require('../util');
 const Q = require('../../admin/assets/quote-calc');
@@ -10,6 +10,7 @@ router.use('/quotes', requirePerm('quotes'));
 const SEGMENTS = ['Home', 'Business', 'Industry', 'Farm'];
 const SYSTEMS = ['On-grid', 'Hybrid', 'Off-grid'];
 const STATUSES = ['Draft', 'Sent', 'Accepted', 'Rejected'];
+const FORMATS = Q.FORMATS.map((f) => f[0]);
 const RATE_KEY = { 'On-grid': 'rate_ongrid', Hybrid: 'rate_hybrid', 'Off-grid': 'rate_offgrid' };
 
 const parse = (s) => { try { return JSON.parse(s) || []; } catch (e) { return []; } };
@@ -34,19 +35,48 @@ function nextNumber(prefix) {
 
 const kwLabel = (k) => (Number(k) % 1 ? Number(k).toFixed(2).replace(/0$/, '') : String(Number(k)));
 
-/** Priced lines + scope of supply for a system, from the rates and makes in Settings → Quotations. */
+/** Component settings (Settings → Quotations), merged over the built-in defaults. */
+function componentsFrom(s) {
+  let list = null;
+  try { list = JSON.parse(s.quote_components); } catch (e) { /* use defaults */ }
+  const byKey = {};
+  (Array.isArray(list) ? list : []).forEach((c) => { if (c && c.key) byKey[c.key] = c; });
+  return QUOTE_COMPONENTS.map((d) => Object.assign({}, d, byKey[d.key] || {}, { key: d.key }));
+}
+
+/**
+ * Priced component lines + scope of supply for a system. The ₹ per kWp rate (Settings) gives the
+ * pre-GST value, shared across the components by their weights; each line carries its HSN/SAC and GST.
+ */
 function defaultsFor(s, { kwp, system, segment }) {
   const k = Number(kwp) || 0;
-  const rate = Number(s[RATE_KEY[system]]) || 0;
-  const where = segment === 'Farm' ? 'solar power system' : (segment === 'Home' ? 'rooftop solar power plant' : 'solar power plant');
-  const items = [{
-    desc: 'Design, supply, installation, testing & commissioning of ' + kwLabel(k) + ' kWp ' + system.toLowerCase() + ' ' + where + ' as per the scope of supply below',
-    hsn: '8541', qty: k, unit: 'kWp', rate, gst: 5,
-  }];
+  const value = Math.round(k * (Number(s[RATE_KEY[system]]) || 0));
   const wp = Number(s.quote_module_wp) || 540;
   const modules = k > 0 ? Math.ceil((k * 1000) / wp) : 0;
+  const home = segment === 'Home';
+  const invType = system === 'On-grid' ? 'grid-tie' : (system === 'Hybrid' ? 'hybrid' : 'off-grid / PCU');
+  const comps = componentsFrom(s).filter((c) => c.key !== 'battery' || system !== 'On-grid');
+  const weight = comps.reduce((a, c) => a + Math.max(0, Number(c.share) || 0), 0);
+  const join = (...parts) => parts.filter(Boolean).join(' ');
+  const shape = {
+    modules: (c) => ({ desc: c.desc + ' — ' + join(s.quote_module_make, wp + ' Wp,', home ? 'DCR (eligible for subsidy)' : 'Mono PERC / TOPCon'), qty: modules, unit: 'Nos' }),
+    inverter: (c) => ({ desc: c.desc + ' (' + invType + ') — ' + join(s.quote_inverter_make, kwLabel(k) + ' kW'), qty: 1, unit: 'No' }),
+    battery: (c) => ({ desc: c.desc + ' — capacity as per design', qty: 1, unit: 'Set' }),
+    install: (c) => ({ desc: c.desc + (system !== 'Off-grid' ? ', incl. net-meter documentation & EB liaison' : ''), qty: 1, unit: 'Lot' }),
+  };
+  const items = comps.map((c) => {
+    const amount = weight ? Math.round((value * Math.max(0, Number(c.share) || 0)) / weight) : 0;
+    const line = (shape[c.key] || ((x) => ({ desc: x.desc, qty: 1, unit: c.key === 'cables' ? 'Lot' : 'Set' })))(c);
+    const group = c.key === 'inverter' && system === 'On-grid' && c.group === 'Inverter & storage' ? 'Inverter' : c.group;
+    return { group, desc: line.desc, hsn: c.hsn, qty: line.qty, unit: line.unit, rate: line.qty ? Math.round(amount / line.qty) : 0, gst: Number(c.gst) };
+  }).filter((it) => it.qty > 0);
+  // Per-panel rates are rounded to the rupee; settle the difference on a single-quantity line so the total is exact.
+  const diff = value - items.reduce((a, it) => a + it.qty * it.rate, 0);
+  const settle = items.slice().reverse().find((it) => it.qty === 1);
+  if (diff && settle && settle.rate + diff >= 0) settle.rate += diff;
+
   const bom = [
-    { item: 'Solar PV modules', spec: [s.quote_module_make, wp + ' Wp', segment === 'Home' ? 'DCR (eligible for subsidy)' : 'Mono PERC / TOPCon'].filter(Boolean).join(' · '), qty: modules + ' Nos' },
+    { item: 'Solar PV modules', spec: [s.quote_module_make, wp + ' Wp', home ? 'DCR (eligible for subsidy)' : 'Mono PERC / TOPCon'].filter(Boolean).join(' · '), qty: modules + ' Nos' },
     { item: system === 'On-grid' ? 'Grid-tie inverter' : (system === 'Hybrid' ? 'Hybrid inverter' : 'Off-grid inverter / PCU'), spec: [s.quote_inverter_make, kwLabel(k) + ' kW'].filter(Boolean).join(' · '), qty: '1 No' },
     system !== 'On-grid' ? { item: 'Battery bank', spec: 'Capacity as per design', qty: '1 Set' } : null,
     { item: 'Module mounting structure', spec: 'Hot-dip galvanised steel, designed for local wind load', qty: '1 Set' },
@@ -56,7 +86,7 @@ function defaultsFor(s, { kwp, system, segment }) {
     system !== 'Off-grid' ? { item: 'Net-meter application & EB liaison', spec: 'Documentation and follow-up till net-meter installation', qty: '1 Lot' } : null,
     { item: 'Installation, testing & commissioning', spec: 'By AVN engineers, including monitoring app set-up', qty: '1 Lot' },
   ].filter(Boolean);
-  const subsidy = segment === 'Home' && system !== 'Off-grid' ? Q.subsidyFor(k) : 0;
+  const subsidy = home && system !== 'Off-grid' ? Q.subsidyFor(k) : 0;
   return { items, bom, subsidy };
 }
 
@@ -75,6 +105,7 @@ function quoteOut(q, full) {
   return Object.assign(out, {
     customerEmail: q.customer_email || '', customerAddress: q.customer_address || '', customerGstin: q.customer_gstin || '',
     items: parse(q.items), bom: parse(q.bom), taxMode: q.tax_mode, interstate: !!q.interstate,
+    format: FORMATS.includes(q.format) ? q.format : 'itemwise', placeOfSupply: q.place_of_supply || '',
     discount: q.discount, subsidy: q.subsidy, subtotal: q.subtotal, gst: q.gst, notes: q.notes || '', terms: q.terms || '',
   });
 }
@@ -89,6 +120,7 @@ function cleanItems(list) {
   if (!Array.isArray(list)) throw bad('Price lines are missing');
   if (list.length > 40) throw bad('Up to 40 price lines');
   return list.map((it) => ({
+    group: str(it && it.group, 80),
     desc: str(it && it.desc, 400),
     hsn: str(it && it.hsn, 12),
     qty: Math.max(0, num(it && it.qty, 0)),
@@ -144,14 +176,15 @@ router.post('/quotes', (req, res) => {
   let id;
   db.transaction(() => {
     id = db.prepare(`INSERT INTO quotes (number, lead_id, project_id, quote_date, valid_until, customer_name, customer_phone, customer_email, customer_address,
-      site_place, segment, system_type, kwp, items, bom, tax_mode, subsidy, terms, created_by)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+      site_place, segment, system_type, kwp, items, bom, tax_mode, subsidy, terms, created_by, format, place_of_supply, interstate)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)`).run(
       nextNumber(s.quote_prefix || 'AVN-Q'), lead ? lead.id : null, lead && lead.project_id ? lead.project_id : null,
       istDate(), istDate(validity), name,
       optStr(pick('customerPhone', lead && lead.phone), 20), optStr(pick('customerEmail', lead && lead.email), 120),
       optStr(req.body.customerAddress, 400), optStr(pick('place', lead && lead.place), 80),
       segment, system, kwp, JSON.stringify(d.items), JSON.stringify(d.bom),
       s.quote_tax_mode === 'itemised' ? 'itemised' : 'composite', d.subsidy, s.quote_terms || '', req.user.id,
+      FORMATS.includes(s.quote_format) ? s.quote_format : 'itemwise', Q.companyState(s),
     ).lastInsertRowid;
     saveTotals(id);
     if (lead) leadNote(lead.id, req.user.id, 'Quotation ' + db.prepare('SELECT number FROM quotes WHERE id = ?').get(id).number + ' created');
@@ -168,7 +201,9 @@ router.patch('/quotes/:id', (req, res) => {
     customer_phone: has('customerPhone') ? optStr(b.customerPhone, 20) : q.customer_phone,
     customer_email: has('customerEmail') ? (str(b.customerEmail) ? email(b.customerEmail) : null) : q.customer_email,
     customer_address: has('customerAddress') ? optStr(b.customerAddress, 400) : q.customer_address,
-    customer_gstin: has('customerGstin') ? optStr(b.customerGstin, 20) : q.customer_gstin,
+    customer_gstin: has('customerGstin') ? optStr(String(b.customerGstin || '').replace(/\s+/g, '').toUpperCase(), 15) : q.customer_gstin,
+    place_of_supply: has('placeOfSupply') ? (Q.stateName(String(b.placeOfSupply || '')) ? String(b.placeOfSupply) : null) : q.place_of_supply,
+    format: has('format') ? (FORMATS.includes(b.format) ? b.format : 'itemwise') : q.format,
     site_place: has('place') ? optStr(b.place, 80) : q.site_place,
     segment: has('segment') && SEGMENTS.includes(b.segment) ? b.segment : q.segment,
     system_type: has('systemType') && SYSTEMS.includes(b.systemType) ? b.systemType : q.system_type,
@@ -186,13 +221,18 @@ router.patch('/quotes/:id', (req, res) => {
     status: has('status') && STATUSES.includes(b.status) ? b.status : q.status,
   };
   if (!f.customer_name) throw bad('Enter the customer name');
+  if (f.customer_gstin && !Q.GSTIN_RE.test(f.customer_gstin)) throw bad('Customer GSTIN should be 15 characters, like 33ABCDE1234F1Z5');
+  // The place of supply decides CGST + SGST or IGST; without one, the old tick box still applies.
+  if (f.place_of_supply) f.interstate = f.place_of_supply !== Q.companyState(getSettings()) ? 1 : 0;
   if (has('customerEmail') && str(b.customerEmail) && !f.customer_email) throw bad('Check the customer email');
   if (f.kwp !== null && (f.kwp <= 0 || f.kwp > 100000)) throw bad('Enter the system size in kWp');
   db.transaction(() => {
     db.prepare(`UPDATE quotes SET customer_name=?, customer_phone=?, customer_email=?, customer_address=?, customer_gstin=?, site_place=?, segment=?, system_type=?,
-      kwp=?, quote_date=?, valid_until=?, items=?, bom=?, tax_mode=?, interstate=?, discount=?, subsidy=?, notes=?, terms=?, status=?, updated_at=datetime('now') WHERE id=?`)
+      kwp=?, quote_date=?, valid_until=?, items=?, bom=?, tax_mode=?, interstate=?, discount=?, subsidy=?, notes=?, terms=?, status=?, format=?, place_of_supply=?,
+      updated_at=datetime('now') WHERE id=?`)
       .run(f.customer_name, f.customer_phone, f.customer_email, f.customer_address, f.customer_gstin, f.site_place, f.segment, f.system_type,
-        f.kwp, f.quote_date, f.valid_until, f.items, f.bom, f.tax_mode, f.interstate, f.discount, f.subsidy, f.notes, f.terms, f.status, q.id);
+        f.kwp, f.quote_date, f.valid_until, f.items, f.bom, f.tax_mode, f.interstate, f.discount, f.subsidy, f.notes, f.terms, f.status,
+        f.format, f.place_of_supply, q.id);
     saveTotals(q.id);
     if (f.status !== q.status && q.lead_id) {
       const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(q.lead_id);
@@ -229,11 +269,11 @@ router.post('/quotes/:id/duplicate', (req, res) => {
   const q = load(req.params.id);
   const s = getSettings();
   const id = db.prepare(`INSERT INTO quotes (number, lead_id, project_id, quote_date, valid_until, customer_name, customer_phone, customer_email, customer_address, customer_gstin,
-    site_place, segment, system_type, kwp, items, bom, tax_mode, interstate, discount, subsidy, notes, terms, created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
+    site_place, segment, system_type, kwp, items, bom, tax_mode, interstate, discount, subsidy, notes, terms, created_by, format, place_of_supply)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(
     nextNumber(s.quote_prefix || 'AVN-Q'), q.lead_id, q.project_id, istDate(), istDate(parseInt(s.quote_validity, 10) || 15),
     q.customer_name, q.customer_phone, q.customer_email, q.customer_address, q.customer_gstin, q.site_place, q.segment, q.system_type, q.kwp,
-    q.items, q.bom, q.tax_mode, q.interstate, q.discount, q.subsidy, q.notes, q.terms, req.user.id,
+    q.items, q.bom, q.tax_mode, q.interstate, q.discount, q.subsidy, q.notes, q.terms, req.user.id, q.format, q.place_of_supply,
   ).lastInsertRowid;
   saveTotals(id);
   if (q.lead_id) leadNote(q.lead_id, req.user.id, 'Revised quotation created from ' + q.number);

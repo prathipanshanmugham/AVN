@@ -1,14 +1,15 @@
 document.addEventListener('alpine:init', () => {
   const PRESETS = [
-    { label: 'Elevated structure', desc: 'Elevated mounting structure (extra height)', hsn: '7308', qty: 1, unit: 'Lot', rate: 0, gst: 18 },
-    { label: 'Battery', desc: 'Solar battery bank', hsn: '8507', qty: 1, unit: 'Set', rate: 0, gst: 18 },
-    { label: 'Net-meter fee', desc: 'EB net-meter and registration charges (at actuals)', hsn: '9987', qty: 1, unit: 'Lot', rate: 0, gst: 18 },
-    { label: 'AMC', desc: 'Annual maintenance contract — panel cleaning and periodic checks', hsn: '9987', qty: 1, unit: 'Year', rate: 0, gst: 18 },
+    { label: 'Elevated structure', group: 'Mounting & balance of system', desc: 'Elevated mounting structure (extra height)', hsn: '7308', qty: 1, unit: 'Lot', rate: 0, gst: 18 },
+    { label: 'Battery', group: 'Inverter & storage', desc: 'Solar battery bank', hsn: '8507', qty: 1, unit: 'Set', rate: 0, gst: 18 },
+    { label: 'Net-meter fee', group: 'Other charges', desc: 'EB net-meter and registration charges (at actuals)', hsn: '9987', qty: 1, unit: 'Lot', rate: 0, gst: 18 },
+    { label: 'AMC', group: 'Annual maintenance', desc: 'Annual maintenance contract — panel cleaning and periodic checks', hsn: '998719', qty: 1, unit: 'Year', rate: 0, gst: 18 },
   ];
 
   Alpine.data('quotes', () => ({
     quotes: [], statuses: ['Draft', 'Sent', 'Accepted', 'Rejected'], q: '', status: 'All', loaded: false,
     segments: ['Home', 'Business', 'Industry', 'Farm'], systems: ['On-grid', 'Hybrid', 'Off-grid'], GST_RATES: QuoteCalc.GST_RATES,
+    FORMATS: QuoteCalc.FORMATS, STATES: QuoteCalc.STATES,
     presets: PRESETS, cfg: {}, isAdmin: false,
     cur: null, detailOpen: false, dirty: false, saving: false, creating: false, form: {}, error: '',
 
@@ -38,10 +39,33 @@ document.addEventListener('alpine:init', () => {
       return { Accepted: 'green', Sent: 'amber', Rejected: 'red', Expired: 'red' }[s] || '';
     },
     get expired() { return this.cur && this.isExpired(this.cur); },
-    get t() { return this.cur ? QuoteCalc.totals(this.cur) : {}; },
+    get t() {
+      if (!this.cur) return { groups: [], hsn: [], taxLines: [] };
+      const q = Object.assign({}, this.cur, { interstate: QuoteCalc.isInterstate(this.cur, this.cfg) });
+      return QuoteCalc.totals(q, { goodsHsn: this.cfg.quote_hsn_system, servicesSac: this.cfg.quote_sac_install });
+    },
+    get groupNames() {
+      let comps = [];
+      try { comps = JSON.parse(this.cfg.quote_components || '[]'); } catch (e) { /* none */ }
+      const names = (this.cur ? this.cur.items.map((it) => it.group) : []).concat(comps.map((c) => c.group), PRESETS.map((p) => p.group), ['Inverter']);
+      return [...new Set(names.map((n) => String(n || '').trim()).filter(Boolean))];
+    },
+    gstinChanged() {
+      const c = this.cur;
+      c.customerGstin = String(c.customerGstin || '').replace(/\s+/g, '').toUpperCase();
+      const st = QuoteCalc.gstinState(c.customerGstin);
+      if (st && st !== c.placeOfSupply) { c.placeOfSupply = st; AVN.toast('Place of supply set to ' + QuoteCalc.stateLabel(st) + ' from the GSTIN'); }
+    },
+    move(i, dir) {
+      const j = i + dir;
+      if (j < 0 || j >= this.cur.items.length) return;
+      const [it] = this.cur.items.splice(i, 1);
+      this.cur.items.splice(j, 0, it);
+      this.dirty = true;
+    },
     get taxRows() {
       if (!this.cur) return [];
-      return this.t.taxLines.flatMap((l) => QuoteCalc.split(l, this.cur.interstate));
+      return this.t.taxLines.flatMap((l) => QuoteCalc.split(l, this.t.interstate));
     },
     get waNumber() { return this.cur ? String(this.cur.customerPhone || '').replace(/\D/g, '').slice(-10) : ''; },
     get waShare() {
@@ -84,7 +108,7 @@ document.addEventListener('alpine:init', () => {
         customerName: c.customerName, customerPhone: c.customerPhone, customerEmail: c.customerEmail, customerAddress: c.customerAddress,
         customerGstin: c.customerGstin, place: c.place, segment: c.segment, systemType: c.systemType, kwp: c.kwp, date: c.date,
         validUntil: c.validUntil, items: c.items, bom: c.bom, taxMode: c.taxMode, interstate: c.interstate, discount: c.discount,
-        subsidy: c.subsidy, notes: c.notes, terms: c.terms, status: c.status,
+        subsidy: c.subsidy, notes: c.notes, terms: c.terms, status: c.status, format: c.format, placeOfSupply: c.placeOfSupply,
       };
     },
     async save() {
@@ -109,7 +133,8 @@ document.addEventListener('alpine:init', () => {
       if (i >= 0) this.quotes.splice(i, 1, full); else this.quotes.unshift(full);
     },
     addLine(p) {
-      this.cur.items.push(Object.assign({ desc: '', hsn: '', qty: 1, unit: 'Nos', rate: 0, gst: 18 }, p ? { desc: p.desc, hsn: p.hsn, qty: p.qty, unit: p.unit, rate: p.rate, gst: p.gst } : {}));
+      this.cur.items.push(Object.assign({ group: '', desc: '', hsn: '', qty: 1, unit: 'Nos', rate: 0, gst: 18 },
+        p ? { group: p.group, desc: p.desc, hsn: p.hsn, qty: p.qty, unit: p.unit, rate: p.rate, gst: p.gst } : {}));
       this.dirty = true;
     },
     async refill() {

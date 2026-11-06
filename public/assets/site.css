@@ -259,9 +259,11 @@ input[type=range]{width:100%;height:44px;accent-color:var(--accent);cursor:point
 .faq{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
 .faq-list{border-top:1px solid var(--line)}
 .faq-item{border-bottom:1px solid var(--line)}
-.faq-item button{width:100%;min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border:0;background:transparent;font-size:19px;font-weight:700;text-align:left;cursor:pointer}
+.faq-item summary{width:100%;min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;font-size:19px;font-weight:700;text-align:left;cursor:pointer;list-style:none}
+.faq-item summary::-webkit-details-marker{display:none}
+.faq-item summary:hover>span:first-child{color:var(--blue)}
 .faq-item .pm{flex:none;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#EEF2F9;transition:transform .35s,background .35s}
-.faq-item.open .pm{transform:rotate(45deg);background:var(--accent)}
+.faq-item[open] .pm{transform:rotate(45deg);background:var(--accent)}
 .faq-item p{margin:0;padding:0 56px 24px 0;color:var(--text2)}
 
 /* contact */
@@ -392,7 +394,7 @@ input[type=range]{width:100%;height:44px;accent-color:var(--accent);cursor:point
   .wiz-step h3{font-size:20px}
   .contact h2{font-size:clamp(32px,9vw,44px)}
   .footer{padding:48px 18px 110px}
-  .faq-item button{font-size:17px;min-height:68px}
+  .faq-item summary{font-size:17px;min-height:68px}
   .faq-item p{padding-right:0}
   .band{min-height:460px}
   .band-inner{padding:72px 20px}
@@ -425,4 +427,16 @@ input[type=range]{width:100%;height:44px;accent-color:var(--accent);cursor:point
 .sd-text b{font-family:var(--display);font-size:11px;color:#111847}
 @media (max-width:1359px){.sunday{display:none!important}}
 .avn-words .w{display:inline-block}
-@media (max-width:430px){.header .logo b{display:none}}
+.cta-short{display:none}
+/* small phones: keep the brand name beside the logo; the quote button gets shorter */
+@media (max-width:430px){
+  .header .logo{gap:8px;min-width:0}
+  .header .logo img,.header.compact .logo img{width:44px;height:44px}
+  .header .logo b{font-size:16px;letter-spacing:0}
+  .header .wrap{gap:8px}
+  .header-actions{gap:8px}
+  .header-actions .btn-accent{padding:0 12px}
+  .cta-long{display:none}.cta-short{display:inline}
+  .menu-btn{width:44px;height:44px}
+}
+@media (max-width:350px){.header .logo b{font-size:14px}.header .logo img,.header.compact .logo img{width:38px;height:38px}}

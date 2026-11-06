@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-IN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>__SITE_TITLE__</title>
 <meta name="description" content="__SITE_DESCRIPTION__">
-<meta property="og:title" content="__SITE_TITLE__">
-<meta property="og:description" content="__SITE_DESCRIPTION__">
-<meta property="og:type" content="website">
-<meta property="og:image" content="__HERO_POSTER__">
+__SEO_HEAD__
 <meta name="theme-color" content="#0E1542">
-<link rel="icon" href="/assets/logo.png">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <link rel="preload" as="image" href="__HERO_POSTER__">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -40,7 +40,7 @@
         <button type="button" class="ta" :class="lang === 'ta' && 'on'" :aria-pressed="(lang === 'ta').toString()" @click="lang = 'ta'" lang="ta">தமிழ்</button>
       </div>
       <a class="btn btn-line btn-sm avn-btn" href="/portal/login"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/></svg>Customer login</a>
-      <a class="btn btn-accent btn-sm avn-shine avn-magnet" href="#contact">Get free quote</a>
+      <a class="btn btn-accent btn-sm avn-shine avn-magnet" href="#contact"><span class="cta-long">Get free quote</span><span class="cta-short">Free quote</span></a>
       <button type="button" class="menu-btn" @click="menu = true" aria-label="Open menu" :aria-expanded="menu.toString()" aria-controls="msheet"><span></span><span></span><span></span></button>
     </div>
   </div>
@@ -159,18 +159,18 @@
     <div class="cards">
       <template x-for="(c, i) in solutions" :key="i">
         <div :class="'avn-tilt avn-st-' + (i + 1)">
-          <a class="sol avn-lift" href="#contact" @pointermove="tilt($event)" @pointerleave="untilt($event)">
+          <a class="sol avn-lift" :href="c.href" @pointermove="tilt($event)" @pointerleave="untilt($event)">
             <template x-if="c.photo"><img class="photo" :src="c.photo.src" :alt="c.photo.alt" loading="lazy"></template>
             <span class="num" x-text="'0' + (i + 1)" x-show="!c.photo"></span>
             <span class="ic avn-bob" :class="'avn-bob-' + (i + 1)" x-show="!c.photo" x-html="c.icon"></span>
             <h3 x-text="c.title"></h3>
             <p x-text="c.text"></p>
-            <span class="go">Get a quote →</span>
+            <span class="go">Learn more →</span>
           </a>
         </div>
       </template>
     </div>
-    <p class="avn-rv" style="margin:0;text-align:center;color:var(--text2)">Already have solar? <a href="#contact" style="font-weight:700">Our care &amp; AMC plans</a> keep every panel earning.</p>
+    <p class="avn-rv" style="margin:0;text-align:center;color:var(--text2)">Already have solar? <a href="/solar-maintenance-amc" style="font-weight:700">Our care &amp; AMC plans</a> keep every panel earning.</p>
   </div>
 </section>
 
@@ -387,12 +387,7 @@
   <div class="faq">
     <h2 class="h2 avn-rv-wipe" style="text-align:center;font-size:clamp(30px,3.6vw,46px)">Good questions.</h2>
     <div class="faq-list avn-rv">
-      <template x-for="(f, i) in faqs" :key="i">
-        <div class="faq-item" :class="faq === i && 'open'">
-          <button type="button" :aria-expanded="(faq === i).toString()" @click="faq = faq === i ? -1 : i"><span x-text="f.q"></span><span class="pm" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#111847" stroke-width="2.4" stroke-linecap="round"><path d="M5 12 H19"/><path d="M12 5 V19"/></svg></span></button>
-          <p class="avn-ans" x-show="faq === i" x-text="f.a"></p>
-        </div>
-      </template>
+__FAQ_HTML__
     </div>
   </div>
 </section>
@@ -472,21 +467,7 @@
   </div>
 </section>
 
-<footer class="footer">
-  <div class="wrap">
-    <div class="top">
-      <div style="display:flex;align-items:center;gap:16px"><span class="chip"><img src="/assets/logo.png" alt="AVN Solar logo" width="60" height="60"></span><span><b style="font-family:var(--display);font-size:18px;color:#fff;display:block" x-text="company.name || 'AVN Solar Solutions'">AVN Solar Solutions</b><span style="font-size:15px">Solar EPC · Tamil Nadu</span></span></div>
-      <nav aria-label="Footer"><a class="avn-ul" href="#solutions">Solutions</a><a class="avn-ul" href="#day">How solar works</a><a class="avn-ul" href="#calculator">Calculator</a><a class="avn-ul" href="#projects">Projects</a><a class="avn-ul" href="/portal/login">Customer login</a></nav>
-    </div>
-    <div class="bottom">
-      <span x-text="[company.address, company.email, company.hours, company.gstin ? 'GSTIN ' + company.gstin : ''].filter(Boolean).join(' · ')"></span>
-      <span style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 24px">
-        <a class="staff" href="/admin/login"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11 V7.5 A4 4 0 0 1 16 7.5 V11"/></svg>Staff login</a>
-        <span>© <span x-text="new Date().getFullYear()">2026</span> <span x-text="company.name || 'AVN Solar Solutions'">AVN Solar Solutions</span> · Website by Dotindot Creative</span>
-      </span>
-    </div>
-  </div>
-</footer>
+__FOOTER__
 
 <div class="sunday" aria-hidden="true" x-show="motion" x-cloak>
   <svg viewBox="0 0 76 40"><path class="sd-arc" d="M6 36 A32 32 0 0 1 70 36"/><path class="sd-ground" d="M2 36 H74"/></svg>

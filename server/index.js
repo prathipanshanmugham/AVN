@@ -19,12 +19,13 @@ app.use(helmet({
     useDefaults: true,
     directives: {
       'default-src': ["'self'"],
-      'script-src': ["'self'", "'unsafe-eval'"],
+      // Google Analytics 4 (only loaded when a GA ID is set in Settings)
+      'script-src': ["'self'", "'unsafe-eval'", 'https://www.googletagmanager.com'],
       'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
       'font-src': ["'self'", 'https://fonts.gstatic.com'],
-      'img-src': ["'self'", 'data:', 'blob:'],
+      'img-src': ["'self'", 'data:', 'blob:', 'https://*.google-analytics.com', 'https://*.googletagmanager.com'],
       'media-src': ["'self'", 'blob:'],
-      'connect-src': ["'self'"],
+      'connect-src': ["'self'", 'https://*.google-analytics.com', 'https://*.analytics.google.com', 'https://*.googletagmanager.com'],
       'frame-ancestors': ["'none'"],
       'form-action': ["'self'"],
       'upgrade-insecure-requests': config.httpsOnly ? [] : null,
@@ -33,6 +34,17 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 app.use(compression());
+
+// www.avnsolar.in → avnsolar.in (one address for search engines), using the website address in Settings.
+app.use((req, res, next) => {
+  const host = String(req.hostname || '');
+  if (!host.startsWith('www.')) return next();
+  try {
+    const site = new URL(require('./db').getSettings().site_url);
+    if (host === 'www.' + site.hostname) return res.redirect(301, site.origin + req.originalUrl);
+  } catch (e) { /* no valid address set: serve as is */ }
+  next();
+});
 app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: false, limit: '200kb' }));
 
@@ -72,7 +84,19 @@ app.get('/vendor/alpine.js', (req, res) => {
 });
 app.use('/admin/assets', express.static(path.join(ADMIN, 'assets'), { maxAge: config.isProd ? '1d' : 0 }));
 app.use('/portal/assets', express.static(path.join(PORTAL, 'assets'), { maxAge: config.isProd ? '1d' : 0 }));
-app.get('/robots.txt', (req, res) => res.type('text').send('User-agent: *\nDisallow: /admin\nDisallow: /portal\nDisallow: /api\n'));
+app.use('/icons', express.static(path.join(PUBLIC, 'icons'), { maxAge: config.isProd ? '30d' : 0 }));
+app.get('/favicon.ico', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=2592000');
+  res.sendFile(path.join(PUBLIC, 'favicon.ico'));
+});
+
+// Search engines: robots, sitemap, web app manifest (all follow the website address in Settings)
+const seo = require('./seo');
+const pages = require('./pages');
+const DEPLOYED = new Date().toISOString().slice(0, 10);
+app.get('/robots.txt', (req, res) => res.type('text').send(seo.robots(seo.getSettings())));
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemap(seo.getSettings(), DEPLOYED)));
+app.get('/site.webmanifest', (req, res) => res.type('application/manifest+json').send(JSON.stringify(seo.manifest(seo.getSettings()))));
 
 // API
 app.use('/api', sessionMiddleware);
@@ -100,22 +124,38 @@ app.get('/files/docs/:id', sessionMiddleware, (req, res) => {
   res.download(path.join(DOCS_DIR, d.stored_name), d.file_name);
 });
 
-// Public website (title and description come from Settings)
+// Public website (title, description and search tags come from Settings)
 let indexTemplate = null;
-const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let pageTemplate = null;
+const esc = seo.esc;
 app.get(['/', '/index.html'], (req, res) => {
   if (!indexTemplate || !config.isProd) indexTemplate = versioned(fs.readFileSync(path.join(PUBLIC, 'index.html'), 'utf8'));
-  const s = require('./db').getSettings();
+  const s = seo.getSettings();
   const hero = db.prepare("SELECT * FROM media WHERE section = 'hero' AND visible = 1 AND status = 'ready' ORDER BY kind = 'video' DESC, position, id").all();
   const video = hero.find((m) => m.kind === 'video');
   const image = hero.find((m) => m.kind === 'image');
   const poster = video && video.poster_name ? '/media/' + video.poster_name : (image ? '/media/' + image.stored_name : '/assets/hero-poster.webp');
+  const parts = {
+    __SITE_TITLE__: esc(s.site_title), __SITE_DESCRIPTION__: esc(s.site_description), __SEO_HEAD__: seo.homeHead(s),
+    __FAQ_HTML__: pages.faqHtml(pages.FAQ), __FOOTER__: pages.footer(s, ''),
+    __HERO_POSTER__: esc(poster), __HERO_VIDEO__: esc(video ? '/media/' + video.stored_name : ''),
+  };
   res.set('Cache-Control', 'no-cache');
-  res.type('html').send(indexTemplate
-    .replace(/__SITE_TITLE__/g, esc(s.site_title))
-    .replace(/__SITE_DESCRIPTION__/g, esc(s.site_description))
-    .replace(/__HERO_POSTER__/g, esc(poster))
-    .replace(/__HERO_VIDEO__/g, esc(video ? '/media/' + video.stored_name : '')));
+  res.type('html').send(indexTemplate.replace(/__[A-Z_]+__/g, (k) => (k in parts ? parts[k] : k)));
+});
+
+// Service pages: /rooftop-solar-for-homes, /commercial-industrial-solar, /solar-water-pumps, /solar-maintenance-amc
+pages.SERVICES.forEach((svc) => {
+  app.get('/' + svc.slug, (req, res) => {
+    if (!pageTemplate || !config.isProd) pageTemplate = versioned(fs.readFileSync(path.join(PUBLIC, 'page.html'), 'utf8'));
+    const s = seo.getSettings();
+    const parts = {
+      __TITLE__: esc(svc.title + ' | ' + (s.brand_name || 'AVN Solar')), __DESCRIPTION__: esc(svc.description), __TYPE__: esc(svc.type),
+      __SEO_HEAD__: seo.serviceHead(s, svc), __BODY__: pages.serviceBody(s, svc),
+    };
+    res.set('Cache-Control', 'no-cache');
+    res.type('html').send(pageTemplate.replace(/__[A-Z_]+__/g, (k) => (k in parts ? parts[k] : k)));
+  });
 });
 
 // Staff back end pages

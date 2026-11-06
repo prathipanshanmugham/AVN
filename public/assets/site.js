@@ -12,10 +12,10 @@
     unsure: ICON('<circle cx="24" cy="24" r="17"/><path d="M19 19 A5 5 0 1 1 26 24 C24.5 25 24 26 24 28"/><path d="M24 33 V34"/>'),
   };
   const SOLUTIONS = [
-    { title: 'Homes', text: 'Rooftop solar with subsidy and net-metering done for you.', icon: IC.home },
-    { title: 'Business', text: 'Cut daytime tariff for shops, schools and hospitals.', icon: IC.biz },
-    { title: 'Industry', text: 'Rooftop and ground-mount plants for mills and factories.', icon: IC.ind },
-    { title: 'Farms', text: 'Solar pumps and off-grid power that replace diesel.', icon: IC.farm },
+    { title: 'Homes', text: 'Rooftop solar with subsidy and net-metering done for you.', icon: IC.home, href: '/rooftop-solar-for-homes' },
+    { title: 'Business', text: 'Cut daytime tariff for shops, schools and hospitals.', icon: IC.biz, href: '/commercial-industrial-solar' },
+    { title: 'Industry', text: 'Rooftop and ground-mount plants for mills and factories.', icon: IC.ind, href: '/commercial-industrial-solar' },
+    { title: 'Farms', text: 'Solar pumps and off-grid power that replace diesel.', icon: IC.farm, href: '/solar-water-pumps' },
   ];
   const STEPS = [
     { t: 'Site survey', d: 'Roof measurement, shadow analysis and a look at your EB bills.' },
@@ -24,12 +24,6 @@
     { t: 'Installation', d: 'Mounting, wiring, earthing and lightning protection by trained crews.' },
     { t: 'Approvals', d: 'EB net-metering, inspection and subsidy filing — tracked to closure.' },
     { t: 'Switch-on', d: 'Commissioning, handover and your customer portal login.' },
-  ];
-  const FAQS = [
-    { q: 'How much roof space do I need?', a: 'About 80–100 sq ft of shade-free roof per kWp. A 3 kWp home system needs roughly 300 sq ft.' },
-    { q: 'Will solar work during a power cut?', a: 'On-grid systems switch off when the grid fails, to keep EB line workers safe. For backup, we design a hybrid system with batteries.' },
-    { q: 'How does the subsidy reach me?', a: 'For eligible homes, the PM Surya Ghar central subsidy — up to ₹78,000 — is paid to your bank account after installation, inspection and net-metering.' },
-    { q: 'What maintenance does solar need?', a: 'Regular panel cleaning plus periodic inverter, wiring and earthing checks. Our care plans cover all of it.' },
   ];
   const WIZ_TYPES = [
     { v: 'Home', t: 'My home', icon: IC.home },
@@ -126,7 +120,7 @@
       gallery: [], solutionPhotos: [], stats: [], banner: [], heroSlides: [], videoFastOnly: true,
       popup: { enabled: false, delay: 25, title: '' },
       videoReady: false, lightbox: null, slide: 0, bandSlide: 0, wi: 0, scrolled: false,
-      steps: STEPS, faqs: FAQS, WIZ_TYPES, BILLS, ROOFS, heroWords: HERO_WORDS,
+      steps: STEPS, WIZ_TYPES, BILLS, ROOFS, heroWords: HERO_WORDS,
       utm: {}, sending: false, leadSent: false, dayP: 0, menu: false, top: false, hideHead: false, menuLinks: MENU,
       wiz: { step: 0, type: '', bill: '', billValue: 0, roof: '', name: '', phone: '', district: '', website: '' }, wizError: '', wizFlash: false,
       calcForm: { name: '', phone: '' }, calcError: '', calcSent: false,
@@ -347,6 +341,7 @@
         if (!res.ok) throw new Error(data.error || 'Could not send. Please call us.');
         this.leadSent = true;
         store.set('avn-popup', String(Date.now()));
+        if (typeof window.gtag === 'function') window.gtag('event', 'generate_lead', { form: payload.form || 'contact' });
       },
       async sendWizard() {
         this.wizError = this.validate(this.wiz.name, this.wiz.phone);

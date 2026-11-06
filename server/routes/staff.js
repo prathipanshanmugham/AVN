@@ -1,8 +1,9 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const { db, MODULES, SETTING_DEFAULTS, getSettings, setSetting, getPermissions } = require('../db');
+const { db, MODULES, SETTING_DEFAULTS, QUOTE_COMPONENTS, getSettings, setSetting, getPermissions } = require('../db');
 const { ensureCsrf, csrfGuard, currentUser, can, requireStaff, allowMustChange, requireAdmin, signIn } = require('../auth');
-const { h, str, optStr, bool, email, bad, notFound, HttpError, generatePassword, hashPassword, checkPassword } = require('../util');
+const { h, str, optStr, bool, email, url, bad, notFound, HttpError, generatePassword, hashPassword, checkPassword } = require('../util');
+const QuoteCalc = require('../../admin/assets/quote-calc');
 const { sendTest } = require('../mailer');
 
 const router = express.Router();
@@ -155,7 +156,36 @@ const LABELS = {
   rate_ongrid: 'on-grid rate', rate_hybrid: 'hybrid rate', rate_offgrid: 'off-grid rate',
 };
 const SWITCHES = ['video_fast_only', 'popup_enabled', 'smtp_secure'];
-const LONG = { site_description: 400, address: 400, quote_terms: 3000, whatsapp_message: 300 };
+const LONG = { site_description: 400, address: 400, quote_terms: 3000, whatsapp_message: 300, quote_components: 4000, service_areas: 400 };
+const HSN_RE = /^[0-9][0-9 ]{3,11}$/;
+const SOCIAL = ['social_facebook', 'social_instagram', 'social_youtube', 'social_linkedin'];
+
+/** Settings → Quotations component table: fixed rows, each with group, description, HSN/SAC, GST and price share. */
+function cleanComponents(raw) {
+  let list;
+  try { list = JSON.parse(raw); } catch (e) { throw bad('Component lines could not be read'); }
+  if (!Array.isArray(list)) throw bad('Component lines could not be read');
+  const byKey = {};
+  list.forEach((c) => { if (c && typeof c.key === 'string') byKey[c.key] = c; });
+  return JSON.stringify(QUOTE_COMPONENTS.map((d) => {
+    const c = byKey[d.key] || d;
+    const hsn = str(c.hsn, 12);
+    if (hsn && !HSN_RE.test(hsn)) throw bad('HSN/SAC for "' + d.desc + '" should be 4 to 8 digits');
+    const share = Number(c.share);
+    if (!Number.isFinite(share) || share < 0 || share > 100) throw bad('Price share for "' + d.desc + '" should be 0 to 100');
+    return {
+      key: d.key, group: str(c.group, 80) || d.group, desc: str(c.desc, 160) || d.desc, hsn,
+      gst: QuoteCalc.GST_RATES.includes(Number(c.gst)) ? Number(c.gst) : d.gst, share,
+    };
+  }));
+}
+/** Accepts the token, or the whole <meta …content="token"> tag Google / Bing give you. */
+function verificationToken(v, label) {
+  const m = String(v).match(/content=["']([^"']+)["']/i);
+  const token = (m ? m[1] : String(v)).trim();
+  if (token && !/^[A-Za-z0-9_-]{8,120}$/.test(token)) throw bad(label + ' verification: paste the code or the whole meta tag');
+  return token;
+}
 const READ_ONLY = ['mail_status'];
 
 router.put('/settings', requireAdmin, (req, res) => {
@@ -183,6 +213,23 @@ router.put('/settings', requireAdmin, (req, res) => {
     if (k === 'smtp_from' && v && !email(v) && !/^[^<>]{1,80}<[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+>$/.test(v)) throw bad('Sender: an email address, or Name <email@domain>');
     if (k === 'smtp_host' && v && !/^[a-z0-9.-]+$/i.test(v)) throw bad('SMTP server looks like smtp.gmail.com');
     if (k === 'smtp_pass' && v === '') return; // blank = keep the saved password
+    if (k === 'quote_format' && !QuoteCalc.FORMATS.some((f) => f[0] === v)) throw bad('Unknown quotation format');
+    if ((k === 'quote_hsn_system' || k === 'quote_sac_install') && v && !HSN_RE.test(v)) throw bad('HSN / SAC codes are 4 to 8 digits');
+    if (k === 'quote_components') v = cleanComponents(v);
+    if (k === 'site_url') {
+      const u = url(v);
+      if (!u || !/^https?:\/\/[^/]+\/?$/.test(u)) throw bad('Website address looks like https://avnsolar.in');
+      v = u.replace(/\/$/, '');
+    }
+    if (k === 'service_areas') v = v.split(/[,\n]+/).map((x) => x.trim()).filter(Boolean).slice(0, 30).join(', ');
+    if (k === 'addr_pincode' && v && !/^\d{6}$/.test(v)) throw bad('PIN code is 6 digits');
+    if (k === 'google_verification') v = verificationToken(v, 'Google');
+    if (k === 'bing_verification') v = verificationToken(v, 'Bing');
+    if (SOCIAL.includes(k) && v) {
+      const u = url(v);
+      if (!u) throw bad('Social links should start with https://');
+      v = u;
+    }
     updates[k] = v;
   });
   if (bool(req.body.smtp_pass_clear)) updates.smtp_pass = '';

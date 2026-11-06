@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Quotation — AVN Solar</title>
-<link rel="icon" href="/assets/logo.png">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
 <link rel="stylesheet" href="/admin/assets/quote-print.css">
 <script defer src="/admin/assets/app.js"></script>
@@ -17,6 +19,9 @@
 <div x-data="printQuote" x-cloak>
   <div class="toolbar">
     <a :href="q ? '/admin/quotes?id=' + q.id : '/admin/quotes'">← Back to quotation</a>
+    <span class="seg" role="group" aria-label="Format" x-show="q">
+      <template x-for="f in FORMATS" :key="f[0]"><button type="button" :class="view === f[0] && 'on'" :aria-pressed="view === f[0]" @click="setView(f[0])" x-text="f[1]"></button></template>
+    </span>
     <span class="hint">In the print window, choose <b>Save as PDF</b> to get a PDF.</span>
     <button type="button" @click="window.print()" :disabled="!q">Print / Save as PDF</button>
   </div>
@@ -31,7 +36,7 @@
             <b class="name" x-text="cfg.company_name || 'AVN Solar Solutions'"></b>
             <div x-show="cfg.address" class="addr" x-text="cfg.address"></div>
             <div x-text="[cfg.phone ? 'Ph: ' + cfg.phone : '', cfg.email].filter(Boolean).join(' · ')"></div>
-            <div x-show="cfg.gstin" x-text="'GSTIN: ' + cfg.gstin"></div>
+            <div x-show="cfg.gstin" x-text="'GSTIN: ' + cfg.gstin + ' · State: ' + QuoteCalc.stateLabel(QuoteCalc.companyState(cfg))"></div>
           </div>
         </div>
         <div class="doc">
@@ -52,6 +57,7 @@
           <div x-show="q.customerAddress" class="addr" x-text="q.customerAddress"></div>
           <div x-text="[q.customerPhone ? 'Ph: ' + q.customerPhone : '', q.customerEmail].filter(Boolean).join(' · ')"></div>
           <div x-show="q.customerGstin" x-text="'GSTIN: ' + q.customerGstin"></div>
+          <div x-show="q.placeOfSupply" x-text="'Place of supply: ' + QuoteCalc.stateLabel(q.placeOfSupply)"></div>
         </div>
         <div>
           <h2>System</h2>
@@ -61,30 +67,93 @@
         </div>
       </section>
 
-      <table class="lines">
+      <!-- Item-wise: every line with its HSN/SAC, quantity, rate, taxable value and GST -->
+      <table class="lines" x-show="view === 'itemwise'">
         <thead>
-          <tr><th class="n">#</th><th>Description</th><th>HSN/SAC</th><th class="r">Qty</th><th>Unit</th><th class="r">Rate (₹)</th><th class="r" x-show="q.taxMode === 'itemised'">GST</th><th class="r">Amount (₹)</th></tr>
+          <tr><th class="n">#</th><th>Description</th><th>HSN/SAC</th><th class="r">Qty</th><th class="r">Rate (₹)</th>
+            <th class="r" x-text="t.itemised ? 'Taxable value (₹)' : 'Amount (₹)'"></th>
+            <th class="r" x-show="t.itemised">GST</th><th class="r" x-show="t.itemised">Amount (₹)</th></tr>
         </thead>
         <tbody>
           <template x-for="(it, i) in t.items" :key="i">
-            <tr><td class="n" x-text="i + 1"></td><td class="desc" x-text="it.desc"></td><td x-text="it.hsn"></td><td class="r" x-text="num(it.qty)"></td><td x-text="it.unit"></td><td class="r" x-text="money(it.rate)"></td><td class="r" x-show="q.taxMode === 'itemised'" x-text="it.gst + '%'"></td><td class="r" x-text="money(it.amount)"></td></tr>
+            <tr><td class="n" x-text="i + 1"></td><td class="desc" x-text="it.desc"></td><td class="hsn" x-text="it.hsn"></td>
+              <td class="r nw" x-text="num(it.qty) + (it.unit ? ' ' + it.unit : '')"></td><td class="r" x-text="money(it.rate)"></td>
+              <td class="r" x-text="money(t.itemised ? it.taxable : it.amount)"></td>
+              <td class="r nw" x-show="t.itemised"><span x-text="it.gst + '%'"></span><small x-text="money(it.tax)"></small></td>
+              <td class="r" x-show="t.itemised" x-text="money(it.total)"></td></tr>
           </template>
         </tbody>
       </table>
+
+      <!-- Grouped: one price per group, the components listed under it -->
+      <table class="lines grouped" x-show="view === 'grouped'">
+        <thead>
+          <tr><th class="n">#</th><th>Description</th><th>HSN/SAC</th>
+            <th class="r" x-text="t.itemised ? 'Taxable value (₹)' : 'Amount (₹)'"></th>
+            <th class="r" x-show="t.itemised">GST</th><th class="r" x-show="t.itemised">Amount (₹)</th></tr>
+        </thead>
+        <tbody>
+          <template x-for="(g, gi) in t.groups" :key="gi">
+            <tr>
+              <td class="n" x-text="gi + 1"></td>
+              <td class="desc">
+                <b x-text="g.name"></b>
+                <template x-if="g.single"><small class="qty" x-text="num(g.items[0].qty) + (g.items[0].unit ? ' ' + g.items[0].unit : '')"></small></template>
+                <template x-if="!g.single"><ul><template x-for="(it, ii) in g.items" :key="ii"><li><span x-text="it.desc"></span> <small class="qty" x-text="'· ' + num(it.qty) + (it.unit ? ' ' + it.unit : '') + (it.hsn ? ' · ' + it.hsn : '')"></small></li></template></ul></template>
+              </td>
+              <td class="hsn" x-text="g.hsn.join(', ')"></td>
+              <td class="r" x-text="money(t.itemised ? g.taxable : g.amount)"></td>
+              <td class="r nw" x-show="t.itemised"><span x-text="g.rates.map((r) => r + '%').join(' / ')"></span><small x-text="money(g.tax)"></small></td>
+              <td class="r" x-show="t.itemised" x-text="money(g.total)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <p class="small" x-show="t.itemised && t.discount" x-text="'Taxable values are after the discount of ₹' + money(t.discount) + ', shared across the lines in proportion to their value.'"></p>
 
       <section class="sum">
         <div class="words">
           <span>Amount in words</span>
           <b x-text="QuoteCalc.words(t.total)"></b>
-          <p x-show="q.taxMode !== 'itemised'" class="small">GST on this solar EPC contract: 70% of the value as supply @ 5% and 30% as services @ 18%.</p>
+          <span style="margin-top:8px">GST in words</span>
+          <b class="gstw" x-text="QuoteCalc.words(t.gst, true)"></b>
+          <p class="small" x-text="t.itemised
+            ? 'GST charged at the rate on each line · effective ' + t.effectiveRate + '% · ' + (t.interstate ? 'IGST (inter-state supply)' : 'CGST + SGST (intra-state supply)') + '.'
+            : 'GST on this solar EPC contract: 70% of the value as supply @ 5% and 30% as services @ 18% (effective ' + t.effectiveRate + '%) · ' + (t.interstate ? 'IGST.' : 'CGST + SGST.')"></p>
         </div>
         <table class="totals">
           <tr><td>Subtotal</td><td x-text="money(t.subtotal)"></td></tr>
           <tr x-show="t.discount"><td>Less: discount</td><td x-text="'− ' + money(t.discount)"></td></tr>
-          <tr x-show="t.discount"><td>Taxable value</td><td x-text="money(t.taxable)"></td></tr>
+          <tr><td>Taxable value</td><td x-text="money(t.taxable)"></td></tr>
           <template x-for="l in taxRows" :key="l.label"><tr><td x-text="l.label"></td><td x-text="money(l.amount)"></td></tr></template>
           <tr x-show="t.roundOff"><td>Round off</td><td x-text="money(t.roundOff)"></td></tr>
           <tr class="grand"><td>Total</td><td x-text="QuoteCalc.inr(t.total)"></td></tr>
+        </table>
+      </section>
+
+      <section class="taxsum">
+        <h3>Tax summary — HSN/SAC-wise</h3>
+        <table class="hsn-table">
+          <thead>
+            <tr><th rowspan="2">HSN/SAC</th><th rowspan="2">Description</th><th class="r" rowspan="2">Taxable value (₹)</th>
+              <th class="c" colspan="2" x-show="!t.interstate">CGST</th>
+              <th class="c" colspan="2" x-show="!t.interstate">SGST</th>
+              <th class="c" colspan="2" x-show="t.interstate">IGST</th>
+              <th class="r" rowspan="2">Total tax (₹)</th></tr>
+            <tr><template x-for="(c, ci) in (t.interstate ? ['Rate', 'Amount'] : ['Rate', 'Amount', 'Rate', 'Amount'])" :key="ci"><th class="r" x-text="c"></th></template></tr>
+          </thead>
+          <tbody>
+            <template x-for="(h, hi) in t.hsn" :key="hi">
+              <tr><td class="hsn"><b x-text="h.hsn || '—'"></b></td><td x-text="h.desc"></td><td class="r" x-text="money(h.base)"></td>
+                <template x-for="part in parts(h)" :key="part.k"><td class="r" x-text="part.text"></td></template>
+                <td class="r" x-text="money(h.amount)"></td></tr>
+            </template>
+          </tbody>
+          <tfoot>
+            <tr><td colspan="2">Total</td><td class="r" x-text="money(t.taxable)"></td>
+              <template x-for="part in parts(t, true)" :key="part.k"><td class="r" x-text="part.text"></td></template>
+              <td class="r" x-text="money(t.gst)"></td></tr>
+          </tfoot>
         </table>
       </section>
 

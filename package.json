@@ -13,7 +13,8 @@
     "admin:set": "node scripts/set-admin.js",
     "admin:reset": "node scripts/reset-admin.js",
     "seed:demo": "node scripts/seed-demo.js",
-    "test": "node scripts/smoke-test.js"
+    "test": "node scripts/smoke-test.js",
+    "icons": "node scripts/make-icons.js"
   },
   "dependencies": {
     "alpinejs": "^3.17.5",

@@ -15,7 +15,7 @@ Every website enquiry (quote wizard, offer popup, calculator, WhatsApp) lands in
 - **CEO Dashboard** (admins; staff only if allowed in Permissions) — company health score out of 100 from six measures (lead win rate, follow-ups on time, projects on schedule, money collected, service requests, installation growth), kW installed per location split into on-grid / hybrid / off-grid, monthly handovers, pipeline, and downloadable PDF reports (company, installations, leads & quotations, collections) for any period.
 - **Website lead capture** — 4-step quote wizard with a live size/savings estimate, once-a-week offer popup (timed or on exit), "send me this estimate" on the calculator, floating WhatsApp button with a pre-filled message, mobile Call / Quote bar. Ad tags (`utm_*`, `gclid`, `fbclid`) set the lead source; repeat enquiries from the same mobile within a day update the same lead.
 - **CRM** — pipeline (New lead → Site survey → Quotation sent → Negotiation → Won / Lost), follow-up dates, owners, notes, call/WhatsApp buttons, convert a won lead into a project.
-- **Quotations** — create from a lead or from scratch; price line, panel count and scope of supply fill in from the kWp and Settings rates. GST as a solar EPC contract (70% @ 5% + 30% @ 18%) or per line, CGST/SGST or IGST, discount, PM Surya Ghar subsidy shown as information, amount in words, numbering per financial year (`AVN-Q/26-27/0001`), printable A4 / Save as PDF, WhatsApp share, revisions. Marking a quote Sent or Accepted moves the lead along the pipeline.
+- **Quotations** — create from a lead or from scratch; component lines (modules, inverter, battery for hybrid/off-grid, structure, cables, ACDB/DCDB, earthing, installation) with HSN/SAC and GST fill in from the kWp and Settings rates, plus the scope of supply. Two print formats, switchable per quotation or on the print page: **item-wise** (every line with HSN/SAC, qty, rate, taxable value, GST) and **grouped** (one price per group, components listed under it). GST as a solar EPC contract (70% @ 5% + 30% @ 18%) or per line; place of supply decides CGST + SGST or IGST (set automatically from the customer's GSTIN); discount shared across lines; HSN/SAC-wise tax summary; amount and GST in words; PM Surya Ghar subsidy shown as information; numbering per financial year (`AVN-Q/26-27/0001`); printable A4 / Save as PDF; WhatsApp share; revisions. Marking a quote Sent or Accepted moves the lead along the pipeline. HSN/SAC codes and rates are starting points — confirm them with your CA.
 - **Projects** — six stages (Survey → Design → Procurement → Installation → Approvals → Switch-on) with a checklist per stage, a Google Drive folder link, a project record (EB details, MNRE / PM Surya Ghar application and approval dates, net meter, system installed, warranty, payments), a serial number register (bulk paste or barcode scan, duplicate check across all projects, search, CSV export), documents (private, optionally shared with the client) and client service requests.
 - **Calendar** — month view of site visits, installations, EB dates, deadlines and meetings, a deadlines list, and Keep-style checklists.
 - **Clients** — staff create a client's portal login (Customer ID like `AVN-2026-0001` + temporary password, with a ready WhatsApp message), reset passwords, disable logins, handle service requests.
@@ -23,9 +23,18 @@ Every website enquiry (quote wizard, offer popup, calculator, WhatsApp) lands in
 - **Settings (admin only)**
   - **Users** — create Admin or Staff accounts (only these two roles), reset passwords, disable accounts.
   - **Permissions** — choose which sections the Staff role can open: CRM, Projects, Calendar, Clients, Website editor. Admins always see everything.
-  - **Company & contact**, **Website & lead capture** (site title/description, WhatsApp message, offer popup, homepage numbers, calculator assumptions, "hero video only on fast connections").
+  - **Company & contact**, **Website & lead capture** (WhatsApp message, offer popup, homepage numbers, calculator assumptions, "hero video only on fast connections").
+  - **Search (SEO) & social** — site title and description with a live Google preview, website address, areas served, office town/PIN, Google Search Console and Bing verification codes (paste the whole tag), Google Analytics 4 ID (form leads are sent as `generate_lead` events), social links.
   - **Lead emails** — recipients and SMTP server (Gmail app password, Hostinger mail, etc.), with a "Send test email" button. The SMTP password is never sent back to the browser.
   - **Quotations & bank** — ₹ per kWp rates, GST mode, numbering, module/inverter makes, terms, bank and UPI details.
+
+## Search engines (SEO)
+
+- Service pages with their own text and quote form: `/rooftop-solar-for-homes`, `/commercial-industrial-solar`, `/solar-water-pumps`, `/solar-maintenance-amc` (content in `server/content.js`).
+- Every public page has a canonical URL, Open Graph / Twitter share card (`public/assets/og-image.jpg`), and JSON-LD: business, website, services, breadcrumbs and FAQ. The FAQ and footer are rendered on the server.
+- `/sitemap.xml`, `/robots.txt` and `/site.webmanifest` follow the website address in Settings; `www.` redirects to the main address.
+- Favicons: `public/favicon.ico` and `public/icons/` are built from `public/assets/logo.png` — run `npm run icons` after changing the logo.
+- After going live: verify the site in Google Search Console (paste the code in Settings → Search), submit `/sitemap.xml`, and keep the Google Business Profile address and phone the same as Settings → Company.
 
 ## Security
 
@@ -81,7 +90,7 @@ Database changes are applied automatically when the app starts (`PRAGMA user_ver
 server/          Express app, SQLite schema, auth, API routes, dashboard metrics, PDF reports (fonts/: DM Sans, OFL licence)
 admin/           Staff back end pages (Alpine.js)
 portal/          Customer portal pages
-public/          Website (index.html, assets, default hero video)
+public/          Website (index.html, page.html for service pages, assets, icons, default hero video)
 deploy/          VPS setup, Nginx, PM2, update script
 scripts/         admin set/reset, demo data, backup, smoke test
 data/, uploads/  created at runtime (database, backups, logs, media, documents) — not in git

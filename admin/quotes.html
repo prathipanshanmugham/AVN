@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Quotations — AVN Workspace</title>
-<link rel="icon" href="/assets/logo.png">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
 <link rel="stylesheet" href="/admin/assets/admin.css">
 <script defer src="/admin/assets/app.js"></script>
@@ -83,7 +85,9 @@
                 <label class="field">Name<input class="input" x-model="cur.customerName" required></label>
                 <label class="field">Mobile<input class="input" x-model="cur.customerPhone" inputmode="tel"></label>
                 <label class="field">Email<input class="input" type="email" x-model="cur.customerEmail"></label>
-                <label class="field">GSTIN <small>businesses</small><input class="input" x-model="cur.customerGstin"></label>
+                <label class="field">GSTIN <small>businesses</small><input class="input" x-model="cur.customerGstin" @change="gstinChanged()" maxlength="15" autocapitalize="characters" spellcheck="false" placeholder="33ABCDE1234F1Z5"></label>
+                <label class="field">Place of supply <small x-text="t.interstate ? 'IGST applies' : 'CGST + SGST'"></small>
+                  <select class="select" x-model="cur.placeOfSupply"><option value="" :selected="!cur.placeOfSupply">Select state</option><template x-for="st in STATES" :key="st[0]"><option :value="st[0]" x-text="st[1] + ' (' + st[0] + ')'" :selected="cur.placeOfSupply === st[0]"></option></template></select></label>
                 <label class="field" style="grid-column:1/-1">Billing address<textarea class="textarea" rows="2" x-model="cur.customerAddress"></textarea></label>
                 <label class="field" style="grid-column:1/-1">Site / place<input class="input" x-model="cur.place"></label>
               </div>
@@ -95,30 +99,44 @@
                 <label class="field">Type<select class="select" x-model="cur.systemType"><template x-for="t in systems" :key="t"><option :value="t" x-text="t" :selected="cur.systemType === t"></option></template></select></label>
                 <label class="field">For<select class="select" x-model="cur.segment"><template x-for="t in segments" :key="t"><option :value="t" x-text="t" :selected="cur.segment === t"></option></template></select></label>
               </div>
-              <p class="small muted" style="margin:0">Changed the size or type? Refill the price line and scope of supply from your Settings rates.</p>
+              <p class="small muted" style="margin:0">Changed the size or type? Refill the component lines and scope of supply from your Settings rates.</p>
               <div><button class="btn" type="button" @click="refill()">Refill lines from rates</button></div>
             </div>
           </div>
 
           <div class="card stack qcard">
-            <div class="row between"><h3>Price</h3>
-              <label class="field gst-field" style="flex-direction:row;align-items:center;gap:10px">GST
-                <select class="select" style="width:auto" x-model="cur.taxMode"><option value="composite" :selected="cur.taxMode === 'composite'">Solar EPC: 70% @ 5% + 30% @ 18%</option><option value="itemised" :selected="cur.taxMode === 'itemised'">Rate on each line</option></select></label>
+            <div class="row between" style="align-items:flex-end">
+              <div><h3>Price</h3><div class="small muted">Lines with HSN/SAC and GST. The group name is used by the grouped format.</div></div>
+              <div class="row" style="gap:12px;align-items:flex-end">
+                <div class="field"><span>Format</span>
+                  <div class="seg" role="group" aria-label="Quotation format">
+                    <template x-for="f in FORMATS" :key="f[0]"><button type="button" :class="cur.format === f[0] && 'on'" :aria-pressed="cur.format === f[0]" @click="cur.format = f[0]; dirty = true" x-text="f[1]"></button></template>
+                  </div></div>
+                <label class="field gst-field">GST
+                  <select class="select" x-model="cur.taxMode"><option value="composite" :selected="cur.taxMode === 'composite'">Solar EPC: 70% @ 5% + 30% @ 18%</option><option value="itemised" :selected="cur.taxMode === 'itemised'">Rate on each line</option></select></label>
+              </div>
             </div>
+            <datalist id="qgroups"><template x-for="g in groupNames" :key="g"><option :value="g"></option></template></datalist>
             <div class="qtable" role="table" aria-label="Price lines">
               <div class="qrow qhead" role="row" :class="cur.taxMode === 'itemised' && 'withgst'">
-                <span role="columnheader">Description</span><span role="columnheader">HSN/SAC</span><span role="columnheader">Qty</span><span role="columnheader">Unit</span><span role="columnheader">Rate (₹)</span><span role="columnheader" x-show="cur.taxMode === 'itemised'">GST</span><span role="columnheader" class="num">Amount</span><span></span>
+                <span role="columnheader">Group · description</span><span role="columnheader">HSN/SAC</span><span role="columnheader">Qty</span><span role="columnheader">Unit</span><span role="columnheader">Rate (₹)</span><span role="columnheader" x-show="cur.taxMode === 'itemised'">GST</span><span role="columnheader" class="num">Amount</span><span></span>
               </div>
               <template x-for="(it, i) in cur.items" :key="i">
                 <div class="qrow" role="row" :class="cur.taxMode === 'itemised' && 'withgst'">
-                  <textarea class="textarea" rows="2" aria-label="Description" x-model="it.desc"></textarea>
-                  <input class="input" aria-label="HSN or SAC code" x-model="it.hsn">
-                  <input class="input" type="number" step="any" min="0" aria-label="Quantity" x-model="it.qty">
-                  <input class="input" aria-label="Unit" x-model="it.unit">
-                  <input class="input" type="number" step="any" min="0" aria-label="Rate" x-model="it.rate">
-                  <select class="select" aria-label="GST rate" x-show="cur.taxMode === 'itemised'" x-model.number="it.gst"><template x-for="g in GST_RATES" :key="g"><option :value="g" x-text="g + '%'" :selected="Number(it.gst) === g"></option></template></select>
+                  <div class="qdesc">
+                    <input class="input qgroup" list="qgroups" aria-label="Group" placeholder="Group (e.g. Solar PV modules)" x-model="it.group">
+                    <textarea class="textarea" rows="2" aria-label="Description" x-model="it.desc"></textarea>
+                  </div>
+                  <label class="qf hsn"><span class="qfl">HSN/SAC</span><input class="input" aria-label="HSN or SAC code" x-model="it.hsn" inputmode="numeric"></label>
+                  <label class="qf"><span class="qfl">Qty</span><input class="input" type="number" step="any" min="0" aria-label="Quantity" x-model="it.qty"></label>
+                  <label class="qf"><span class="qfl">Unit</span><input class="input" aria-label="Unit" x-model="it.unit"></label>
+                  <label class="qf"><span class="qfl">Rate (₹)</span><input class="input" type="number" step="any" min="0" aria-label="Rate" x-model="it.rate"></label>
+                  <label class="qf" x-show="cur.taxMode === 'itemised'"><span class="qfl">GST</span><select class="select" aria-label="GST rate" x-model.number="it.gst"><template x-for="g in GST_RATES" :key="g"><option :value="g" x-text="g + '%'" :selected="Number(it.gst) === g"></option></template></select></label>
                   <b class="num" x-text="QuoteCalc.inr((Number(it.qty) || 0) * (Number(it.rate) || 0))"></b>
-                  <button class="btn sm danger icon" type="button" @click="cur.items.splice(i, 1); dirty = true" :aria-label="'Remove line ' + (i + 1)">✕</button>
+                  <div class="qact">
+                    <button class="btn sm danger icon" type="button" @click="cur.items.splice(i, 1); dirty = true" :aria-label="'Remove line ' + (i + 1)">✕</button>
+                    <button class="btn sm icon" type="button" x-show="i > 0" @click="move(i, -1)" :aria-label="'Move line ' + (i + 1) + ' up'">↑</button>
+                  </div>
                 </div>
               </template>
             </div>
@@ -129,10 +147,15 @@
 
             <div class="split" style="align-items:flex-start">
               <div class="stack" style="flex:1 1 260px">
-                <label class="field">Discount (₹)<input class="input" type="number" step="any" min="0" x-model="cur.discount"></label>
-                <label class="check" style="padding:0"><input type="checkbox" x-model="cur.interstate"><span>Customer is outside Tamil Nadu (IGST)</span></label>
+                <label class="field">Discount (₹) <small>shared across the lines in proportion</small><input class="input" type="number" step="any" min="0" x-model="cur.discount"></label>
                 <label class="field">Expected subsidy (₹) <small>shown as information, not deducted</small>
                   <span class="row" style="flex-wrap:nowrap"><input class="input" type="number" step="any" min="0" x-model="cur.subsidy"><button class="btn sm" type="button" @click="cur.subsidy = QuoteCalc.subsidyFor(cur.kwp); dirty = true" title="PM Surya Ghar central subsidy for homes">PM Surya Ghar</button></span></label>
+                <div class="qgroups" x-show="cur.format === 'grouped'">
+                  <div class="small muted" style="font-weight:700;margin-bottom:4px">As printed (grouped)</div>
+                  <template x-for="(g, gi) in t.groups" :key="gi">
+                    <div class="qgline"><span><b x-text="g.name"></b><small x-text="g.single ? (g.items[0].hsn || '') : g.items.length + ' items · ' + g.hsn.join(', ')"></small></span><b x-text="QuoteCalc.inr(g.taxable, true)"></b></div>
+                  </template>
+                </div>
               </div>
               <div class="totals" style="flex:1 1 320px">
                 <div><span>Subtotal</span><b x-text="QuoteCalc.inr(t.subtotal, true)"></b></div>
@@ -141,10 +164,29 @@
                 <template x-for="l in taxRows" :key="l.label"><div><span x-text="l.label"></span><b x-text="QuoteCalc.inr(l.amount, true)"></b></div></template>
                 <div x-show="t.roundOff"><span>Round off</span><b x-text="QuoteCalc.inr(t.roundOff, true)"></b></div>
                 <div class="grand"><span>Total</span><b x-text="QuoteCalc.inr(t.total)"></b></div>
-                <div class="small muted" x-text="QuoteCalc.words(t.total)"></div>
+                <div class="small muted" x-text="QuoteCalc.words(t.total) + ' · GST ' + QuoteCalc.inr(t.gst, true) + ' (' + t.effectiveRate + '% effective)'"></div>
                 <div class="eff" x-show="t.subsidy"><span>Effective cost after subsidy</span><b x-text="QuoteCalc.inr(t.effective)"></b></div>
               </div>
             </div>
+
+            <details class="hsnsum">
+              <summary>HSN/SAC-wise tax summary</summary>
+              <div class="tablewrap">
+                <table class="table">
+                  <thead><tr><th>HSN/SAC</th><th class="r">Taxable value</th><th class="r">Rate</th>
+                    <th class="r" x-show="!t.interstate">CGST</th><th class="r" x-show="!t.interstate">SGST</th>
+                    <th class="r" x-show="t.interstate">IGST</th><th class="r">Total tax</th></tr></thead>
+                  <tbody>
+                    <template x-for="(h, hi) in t.hsn" :key="hi"><tr><td><b x-text="h.hsn || '—'"></b><br><small class="muted" x-text="h.desc"></small></td><td class="r" x-text="QuoteCalc.inr(h.base, true)"></td><td class="r" x-text="h.rate + '%'"></td>
+                      <td class="r" x-text="QuoteCalc.inr(h.cgst, true)" x-show="!t.interstate"></td><td class="r" x-text="QuoteCalc.inr(h.sgst, true)" x-show="!t.interstate"></td>
+                      <td class="r" x-text="QuoteCalc.inr(h.igst, true)" x-show="t.interstate"></td><td class="r" x-text="QuoteCalc.inr(h.amount, true)"></td></tr></template>
+                  </tbody>
+                  <tfoot><tr><td>Total</td><td class="r" x-text="QuoteCalc.inr(t.taxable, true)"></td><td></td>
+                    <td class="r" x-text="QuoteCalc.inr(t.cgst, true)" x-show="!t.interstate"></td><td class="r" x-text="QuoteCalc.inr(t.sgst, true)" x-show="!t.interstate"></td>
+                    <td class="r" x-text="QuoteCalc.inr(t.igst, true)" x-show="t.interstate"></td><td class="r" x-text="QuoteCalc.inr(t.gst, true)"></td></tr></tfoot>
+                </table>
+              </div>
+            </details>
           </div>
 
           <div class="card stack qcard">

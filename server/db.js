@@ -28,6 +28,27 @@ const PROJECT_CHECKLISTS = [
   ['System commissioned', 'Monitoring app set up', 'Customer handover done', 'Warranty cards shared'],
 ];
 
+const SITE_TITLE = 'AVN Solar | Rooftop Solar & Solar EPC Company in Tamil Nadu';
+const SITE_DESCRIPTION = 'Rooftop solar for homes, businesses, industry and farms across Tamil Nadu — PM Surya Ghar subsidy help, net-metering and service from one local team.';
+const OLD_SITE_TITLE = 'AVN Solar — Solar EPC in Tamil Nadu';
+const OLD_SITE_DESCRIPTION = 'Rooftop and ground-mount solar for homes, businesses, industry and farms across Tamil Nadu — designed, installed and net-metered by one team.';
+
+/*
+ * Component lines for new quotations. The ₹ per kWp rate is shared across them by `share`
+ * (weights, re-balanced over the components a system has — the battery only for hybrid / off-grid).
+ * HSN/SAC and GST are starting points; confirm them with your CA. Editable in Settings → Quotations.
+ */
+const QUOTE_COMPONENTS = [
+  { key: 'modules', group: 'Solar PV modules', desc: 'Solar PV modules', hsn: '8541 43 00', gst: 5, share: 48 },
+  { key: 'inverter', group: 'Inverter & storage', desc: 'Solar inverter', hsn: '8504 40', gst: 5, share: 14 },
+  { key: 'battery', group: 'Inverter & storage', desc: 'Battery bank', hsn: '8507', gst: 18, share: 25 },
+  { key: 'structure', group: 'Mounting & balance of system', desc: 'Module mounting structure — hot-dip galvanised steel', hsn: '7308', gst: 18, share: 12 },
+  { key: 'cables', group: 'Mounting & balance of system', desc: 'DC & AC cables, conduits and accessories', hsn: '8544', gst: 18, share: 6 },
+  { key: 'acdb', group: 'Mounting & balance of system', desc: 'ACDB / DCDB with surge protection and MCBs', hsn: '8537', gst: 18, share: 4 },
+  { key: 'earthing', group: 'Mounting & balance of system', desc: 'Earthing kit and lightning arrester', hsn: '8535', gst: 18, share: 3 },
+  { key: 'install', group: 'Installation & commissioning', desc: 'Installation, testing & commissioning', hsn: '995461', gst: 18, share: 13 },
+];
+
 const SETTING_DEFAULTS = {
   company_name: 'AVN Solar Solutions',
   brand_name: 'AVN Solar',
@@ -37,9 +58,15 @@ const SETTING_DEFAULTS = {
   email: '',
   address: '',
   hours: 'Mon–Sat, 9:30 AM – 6:30 PM',
-  site_title: 'AVN Solar — Solar EPC in Tamil Nadu',
-  site_description: 'Rooftop and ground-mount solar for homes, businesses, industry and farms across Tamil Nadu — designed, installed and net-metered by one team.',
+  site_title: SITE_TITLE,
+  site_description: SITE_DESCRIPTION,
   ga_id: '',
+  // Search & social (SEO)
+  site_url: 'https://avnsolar.in',
+  service_areas: 'Tamil Nadu',
+  addr_city: '', addr_pincode: '',
+  google_verification: '', bing_verification: '',
+  social_facebook: '', social_instagram: '', social_youtube: '', social_linkedin: '',
   calc_yield: '4',
   calc_roof: '90',
   calc_tariff_home: '6',
@@ -61,6 +88,10 @@ const SETTING_DEFAULTS = {
   quote_prefix: 'AVN-Q',
   quote_validity: '15',
   quote_tax_mode: 'composite',
+  quote_format: 'itemwise',
+  quote_hsn_system: '8541 43 00',
+  quote_sac_install: '995461',
+  quote_components: JSON.stringify(QUOTE_COMPONENTS),
   rate_ongrid: '0', rate_hybrid: '0', rate_offgrid: '0',
   quote_module_wp: '540', quote_module_make: '', quote_inverter_make: '',
   quote_terms: [
@@ -367,6 +398,16 @@ const MIGRATIONS = [
     });
     db.exec('CREATE INDEX IF NOT EXISTS idx_projects_completed ON projects(completed_at)');
   },
+  // 3: quotation format (item-wise / grouped) and place of supply; new site title and description.
+  () => {
+    const cols = db.prepare('PRAGMA table_info(quotes)').all().map((c) => c.name);
+    if (!cols.includes('format')) db.exec("ALTER TABLE quotes ADD COLUMN format TEXT NOT NULL DEFAULT 'itemwise'");
+    if (!cols.includes('place_of_supply')) db.exec('ALTER TABLE quotes ADD COLUMN place_of_supply TEXT');
+    db.exec("UPDATE quotes SET place_of_supply = '33' WHERE place_of_supply IS NULL AND interstate = 0");
+    // Only replace the title and description if they were never changed.
+    db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?').run(SITE_TITLE, 'site_title', OLD_SITE_TITLE);
+    db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?').run(SITE_DESCRIPTION, 'site_description', OLD_SITE_DESCRIPTION);
+  },
 ];
 
 /** "5 kWp", "120kW", "3.3" → number of kW. Pump ratings in HP are left for staff to fill in. */
@@ -473,6 +514,6 @@ function setSetting(key, value) {
 }
 
 module.exports = {
-  db, MODULES, STAGES_LEAD, STAGES_PROJECT, SETTING_DEFAULTS, PROJECT_FIELDS, ASSET_KINDS, SYSTEM_TYPES, parseKw, guessSystem,
+  db, MODULES, STAGES_LEAD, STAGES_PROJECT, SETTING_DEFAULTS, QUOTE_COMPONENTS, PROJECT_FIELDS, ASSET_KINDS, SYSTEM_TYPES, parseKw, guessSystem,
   getSettings, setSetting, getPermissions, createProjectTasks,
 };
