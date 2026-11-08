@@ -95,6 +95,26 @@ async function processImage(tmpPath) {
 }
 
 /**
+ * Blog cover: a WebP for the page (max 1600px wide) and a 1200×630 JPG for WhatsApp / Facebook / Google previews.
+ */
+async function processCover(tmpPath) {
+  const storedName = randomName('.webp');
+  const ogName = randomName('.jpg');
+  try {
+    const src = sharp(tmpPath).rotate();
+    await src.clone().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toFile(path.join(MEDIA_DIR, storedName));
+    await src.clone().resize(1200, 630, { fit: 'cover', position: sharp.strategy.attention }).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(MEDIA_DIR, ogName));
+  } catch (e) {
+    removeFile(MEDIA_DIR, storedName);
+    removeFile(MEDIA_DIR, ogName);
+    throw bad('Could not read that image. Try a JPG or PNG.');
+  } finally {
+    fs.unlink(tmpPath, () => {});
+  }
+  return { storedName, ogName };
+}
+
+/**
  * Videos: with ffmpeg, compress to a muted 720p H.264 MP4 plus a WebP poster (in the background).
  * Without ffmpeg the original file is kept as-is.
  */
@@ -135,4 +155,13 @@ function removeFile(dir, name) {
   fs.unlink(path.join(dir, name), () => {});
 }
 
-module.exports = { MEDIA_DIR, DOCS_DIR, IMAGE_TYPES, VIDEO_TYPES, mediaUpload, docUpload, logoUpload, processImage, processLogo, processVideo, removeFile, hasFfmpeg };
+const imageUpload = multer({
+  storage: tmpStorage,
+  limits: { fileSize: 20 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (IMAGE_TYPES.includes(file.mimetype)) return cb(null, true);
+    cb(bad('Upload a JPG, PNG or WebP image'));
+  },
+});
+
+module.exports = { MEDIA_DIR, DOCS_DIR, IMAGE_TYPES, VIDEO_TYPES, mediaUpload, docUpload, logoUpload, imageUpload, processImage, processLogo, processCover, processVideo, removeFile, hasFfmpeg };

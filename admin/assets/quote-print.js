@@ -12,7 +12,7 @@ document.addEventListener('alpine:init', () => {
         const want = new URLSearchParams(location.search).get('format');
         this.view = QuoteCalc.FORMATS.some((f) => f[0] === want) ? want : (q.format || 'itemwise');
         const sum = new URLSearchParams(location.search).get('summary');
-        this.showSummary = sum === '1' ? true : (sum === '0' ? false : q.taxSummary !== false);
+        this.showSummary = sum === '1' ? true : (sum === '0' ? false : this.summaryDefault());
         document.title = q.number + ' — ' + q.customerName;
         // On phones, show the A4 page scaled to fit, like a PDF preview.
         const fit = () => {
@@ -38,8 +38,12 @@ document.addEventListener('alpine:init', () => {
       u.searchParams.set('summary', this.showSummary ? '1' : '0');
       history.replaceState(null, '', u);
     },
+    /** The HSN summary lists values per code, so the grouped view (no component prices) leaves it off unless asked. */
+    summaryDefault() { return this.view === 'itemwise' && this.q.taxSummary !== false; },
     setView(f) {
       this.view = f;
+      this.showSummary = this.summaryDefault();
+      this.setSummary();
       const u = new URL(location.href);
       u.searchParams.set('format', f);
       history.replaceState(null, '', u);

@@ -96,6 +96,7 @@ document.addEventListener('alpine:init', () => {
       { id: 'clients', name: 'Clients', desc: 'Create client portal logins, service requests' },
       { id: 'quotes', name: 'Quotations', desc: 'Create, print and share quotations' },
       { id: 'website', name: 'Website editor', desc: 'Hero video and photos, gallery, brand logos' },
+      { id: 'blog', name: 'Blog', desc: 'Write, schedule and publish articles on the website' },
     ],
     sec: 'users', isAdmin: false, users: [], perms: {}, cfg: {}, comps: [],
     modal: null, uform: {}, error: '', secret: {},

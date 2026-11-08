@@ -103,9 +103,11 @@ app.get(/^\/(sample-page|hello-world|feed|comments\/feed|author\/[^/]+|category\
 // Search engines: robots, sitemap, web app manifest (all follow the website address in Settings)
 const seo = require('./seo');
 const pages = require('./pages');
+const pages_ = pages;
 const DEPLOYED = new Date().toISOString().slice(0, 10);
 app.get('/robots.txt', (req, res) => res.type('text').send(seo.robots(seo.getSettings())));
-app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemap(seo.getSettings(), DEPLOYED)));
+const blog = require('./blog');
+app.get('/sitemap.xml', (req, res) => res.type('application/xml').send(seo.sitemap(seo.getSettings(), DEPLOYED, blog.livePosts({ limit: 5000 }).posts)));
 app.get('/site.webmanifest', (req, res) => res.type('application/manifest+json').send(JSON.stringify(seo.manifest(seo.getSettings()))));
 
 // API
@@ -118,6 +120,7 @@ app.use('/api', require('./routes/calendar'));
 app.use('/api', require('./routes/website'));
 app.use('/api', require('./routes/clients'));
 app.use('/api', require('./routes/quotes'));
+app.use('/api', require('./routes/blog'));
 app.use('/api', require('./routes/dashboard'));
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 
@@ -147,11 +150,56 @@ app.get(['/', '/index.html'], (req, res) => {
   const poster = video && video.poster_name ? '/media/' + video.poster_name : (image ? '/media/' + image.stored_name : '/assets/hero-poster.webp');
   const parts = {
     __SITE_TITLE__: esc(s.site_title), __SITE_DESCRIPTION__: esc(s.site_description), __SEO_HEAD__: seo.homeHead(s),
-    __FAQ_HTML__: pages.faqHtml(pages.FAQ), __FOOTER__: pages.footer(s, ''),
+    __FAQ_HTML__: pages.faqHtml(pages.FAQ), __FOOTER__: pages.footer(s, ''), __BLOG_HTML__: pages.latestPostsHtml(blog.livePosts({ limit: 3 }).posts),
     __HERO_POSTER__: esc(poster), __HERO_VIDEO__: esc(video ? '/media/' + video.stored_name : ''),
   };
   res.set('Cache-Control', 'no-cache');
   res.type('html').send(indexTemplate.replace(/__[A-Z_]+__/g, (k) => (k in parts ? parts[k] : k)));
+});
+
+// Blog: /blog (list, ?tag= and ?page=), /blog/feed.xml (RSS), /blog/:slug (signed-in staff can preview drafts)
+const PER_PAGE = 9;
+function sendPublic(res, { title, description, head, body, type, status }) {
+  if (!pageTemplate || !config.isProd) pageTemplate = versioned(fs.readFileSync(path.join(PUBLIC, 'page.html'), 'utf8'));
+  const parts = { __TITLE__: esc(title), __DESCRIPTION__: esc(description), __TYPE__: esc(type || 'Home'), __SEO_HEAD__: head, __BODY__: body };
+  res.status(status || 200).set('Cache-Control', 'no-cache');
+  res.type('html').send(pageTemplate.replace(/__[A-Z_]+__/g, (k) => (k in parts ? parts[k] : k)));
+}
+app.get('/blog', (req, res) => {
+  const s = seo.getSettings();
+  const tags = blog.allTags();
+  const tag = tags.some((t) => t.slug === req.query.tag) ? req.query.tag : '';
+  if (req.query.tag && !tag) return res.redirect(301, '/blog');
+  const all = blog.livePosts({ limit: 100000, tag });
+  const pages = Math.max(1, Math.ceil(all.total / PER_PAGE));
+  const page = Math.min(pages, Math.max(1, parseInt(req.query.page, 10) || 1));
+  const posts = all.posts.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+  const tagName = tag ? tags.find((t) => t.slug === tag).name : '';
+  const h = seo.blogListHead(s, { page, tag, tagName, posts });
+  sendPublic(res, { title: h.title, description: h.description, head: h.head, body: pages_.blogListBody(s, { posts, page, pages, tag, tags }) });
+});
+app.get('/blog/feed.xml', (req, res) => {
+  res.type('application/rss+xml').send(seo.rss(seo.getSettings(), blog.livePosts({ limit: 20 }).posts));
+});
+// Drafts and scheduled posts: only signed-in staff with the Blog permission (the session is read only then).
+const staffPreview = (req, res, next) => (blog.livePost(String(req.params.slug).toLowerCase()) ? next() : sessionMiddleware(req, res, next));
+app.get('/blog/:slug', staffPreview, (req, res, next) => {
+  const slug = String(req.params.slug).toLowerCase();
+  let p = blog.livePost(slug);
+  let preview = false;
+  if (!p) {
+    const draft = blog.anyPost(slug);
+    if (draft && can(currentUser(req), 'blog')) { p = draft; preview = true; }
+  }
+  if (!p) return next();
+  if (p.slug !== req.params.slug) return res.redirect(301, '/blog/' + p.slug);
+  const s = seo.getSettings();
+  const tags = blog.tagsOf(p).map(blog.slugify);
+  const others = blog.livePosts({ limit: 50 }).posts.filter((x) => x.id !== p.id);
+  const related = others.filter((x) => blog.tagsOf(x).some((t) => tags.includes(blog.slugify(t)))).concat(others).filter((x, i, a) => a.indexOf(x) === i).slice(0, 3);
+  const h = seo.postHead(s, p, preview);
+  if (preview) res.set('X-Robots-Tag', 'noindex');
+  sendPublic(res, { title: h.title, description: h.description, head: h.head, body: pages_.postBody(s, p, related, preview) });
 });
 
 // Service pages: /rooftop-solar-for-homes, /commercial-industrial-solar, /solar-water-pumps, /solar-maintenance-amc
@@ -170,7 +218,7 @@ pages.SERVICES.forEach((svc) => {
 
 // Staff back end pages
 const ADMIN_PAGES = {
-  dashboard: 'dashboard', crm: 'crm', quotes: 'quotes', 'quote-print': 'quotes', projects: 'projects', calendar: 'calendar', website: 'website', clients: 'clients',
+  dashboard: 'dashboard', crm: 'crm', quotes: 'quotes', 'quote-print': 'quotes', projects: 'projects', calendar: 'calendar', website: 'website', blog: 'blog', clients: 'clients',
   settings: null, account: null,
 };
 function firstAllowedPage(user) {

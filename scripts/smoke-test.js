@@ -363,7 +363,8 @@ async function main() {
     r = await anon.req('GET', '/robots.txt');
     ok(r.status === 200 && /Sitemap: https:\/\/avnsolar\.in\/sitemap\.xml/.test(r.data) && /Disallow: \/admin/.test(r.data), 'robots.txt points to the sitemap, hides the back end');
     r = await anon.req('GET', '/sitemap.xml');
-    ok(r.status === 200 && (String(r.data).match(/<loc>/g) || []).length === 5 && String(r.data).includes('https://avnsolar.in/rooftop-solar-for-homes'), 'sitemap lists the homepage and service pages');
+    ok(r.status === 200 && (String(r.data).match(/<loc>/g) || []).length === 6 && String(r.data).includes('https://avnsolar.in/rooftop-solar-for-homes') && String(r.data).includes('<loc>https://avnsolar.in/blog</loc>'),
+      'sitemap lists the homepage, service pages and blog');
     r = await anon.req('GET', '/');
     const home = String(r.data);
     const ldOf = (html) => { const m = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/); return m ? JSON.parse(m[1]) : null; };
@@ -413,6 +414,65 @@ async function main() {
       ldOf(String(r.data))['@graph'][0].areaServed.length === 3, 'verification, Analytics and service areas on the homepage');
     r = await anon.req('GET', '/assets/ga.js');
     ok(r.status === 200, 'Analytics loader served from a file (no inline script)');
+
+    console.log('Blog');
+    r = await anon.req('GET', '/blog');
+    ok(r.status === 200 && String(r.data).includes('first articles are on the way') && !String((await anon.req('GET', '/')).data).includes('From the blog'),
+      'blog page works before anything is published; homepage section hidden');
+    r = await admin.req('GET', '/api/blog');
+    ok(r.status === 200 && r.data.length === 3 && r.data.every((p) => p.state === 'Draft'), 'three starter articles waiting as drafts');
+    const starter = r.data.find((p) => p.slug === 'pm-surya-ghar-subsidy-tamil-nadu');
+    r = await anon.req('GET', '/blog/' + starter.slug);
+    ok(r.status === 404, 'drafts are not public');
+    r = await admin.req('GET', '/blog/' + starter.slug);
+    ok(r.status === 200 && String(r.data).includes('noindex') && String(r.data).includes('Only signed-in staff'), 'staff can preview a draft (not indexed)');
+    r = await staff.req('GET', '/api/blog');
+    ok(r.status === 403, 'staff need the Blog permission');
+    r = await admin.req('POST', '/api/blog', { title: 'Net metering in Tamil Nadu, explained' });
+    const post = r.data;
+    ok(r.status === 201 && post.slug === 'net-metering-in-tamil-nadu-explained' && post.state === 'Draft', 'new post gets a web address from its title');
+    r = await admin.req('PATCH', '/api/blog/' + post.id, { status: 'published' });
+    ok(r.status === 400, 'an empty post cannot be published');
+    r = await admin.req('PATCH', '/api/blog/' + post.id, { slug: starter.slug });
+    ok(r.status === 400, 'two posts cannot share a web address');
+    r = await admin.req('PATCH', '/api/blog/' + post.id, { slug: 'Bad Address!' });
+    ok(r.status === 400, 'web address must be small letters, numbers and hyphens');
+    const body = '# Big heading\n\nA two-way meter **records** both directions. <script>alert(1)</script>\n\n[bad](javascript:alert(1)) and [good](/rooftop-solar-for-homes) and [out](https://mnre.gov.in)';
+    r = await admin.req('PATCH', '/api/blog/' + post.id, { body, tags: 'Net metering, Homes', excerpt: 'How the two-way meter works.', status: 'published' });
+    ok(r.status === 200 && r.data.state === 'Published' && r.data.publishedAt, 'published');
+    const cf = new FormData();
+    cf.append('file', new Blob([await sharp({ create: { width: 2000, height: 1300, channels: 3, background: '#F7931E' } }).jpeg().toBuffer()], { type: 'image/jpeg' }), 'cover.jpg');
+    r = await admin.req('POST', '/api/blog/' + post.id + '/cover', cf, true);
+    ok(r.status === 200 && /\.webp$/.test(r.data.cover), 'cover photo saved as WebP');
+    r = await anon.req('GET', '/blog/' + post.slug);
+    const art = String(r.data);
+    const ogFile = (art.match(/og:image" content="https:\/\/avnsolar\.in\/media\/([a-f0-9]+\.jpg)"/) || [])[1];
+    const ogMeta = ogFile ? await sharp(path.join(tmp, 'uploads', 'media', ogFile)).metadata() : {};
+    ok(ogMeta.width === 1200 && ogMeta.height === 630 && ogMeta.format === 'jpeg', 'a 1200×630 share image is made from the cover');
+    const artLd = ldOf(art);
+    ok(r.status === 200 && art.includes('<h1>Net metering in Tamil Nadu, explained</h1>') && art.includes('<h2 id="big-heading">Big heading</h2>') &&
+      art.includes('&lt;script&gt;') && !art.includes('<script>alert') && !art.includes('href="javascript') && art.includes('href="https://mnre.gov.in" target="_blank" rel="noopener"'),
+      'article renders safely: one h1, raw HTML shown as text, unsafe links dropped');
+    ok(artLd['@graph'].some((n) => n['@type'] === 'BlogPosting' && n.headline && n.datePublished) && art.includes('og:type" content="article"') && art.includes('/media/' + ogFile),
+      'article structured data and share image');
+    r = await anon.req('GET', '/blog');
+    ok(String(r.data).includes('/blog/' + post.slug) && String((await anon.req('GET', '/')).data).includes('From the blog'), 'listed on /blog and the homepage');
+    r = await anon.req('GET', '/blog?tag=net-metering');
+    ok(r.status === 200 && String(r.data).includes(post.title), 'topic filter');
+    r = await anon.req('GET', '/blog?tag=nothing-here');
+    ok(r.status === 301, 'unknown topic goes back to the blog');
+    r = await anon.req('GET', '/sitemap.xml');
+    ok(String(r.data).includes('/blog/' + post.slug) && String(r.data).includes('<loc>https://avnsolar.in/blog</loc>'), 'sitemap lists the blog and the post');
+    r = await anon.req('GET', '/blog/feed.xml');
+    ok(r.status === 200 && String(r.data).includes('<rss') && String(r.data).includes('/blog/' + post.slug), 'RSS feed');
+    r = await admin.req('PATCH', '/api/blog/' + starter.id, { status: 'published', publishedAt: new Date(Date.now() + 86400000).toISOString() });
+    ok(r.status === 200 && r.data.state === 'Scheduled' && (await anon.req('GET', '/blog/' + starter.slug)).status === 404, 'scheduled post stays hidden until its time');
+    r = await admin.req('PATCH', '/api/blog/' + starter.id, { publishedAt: new Date(Date.now() - 60000).toISOString() });
+    ok(r.data.state === 'Published' && (await anon.req('GET', '/blog/' + starter.slug)).status === 200, 'goes live once the time has passed');
+    r = await admin.req('POST', '/api/blog/preview', { body: '## Hi\n\n<b>x</b>' });
+    ok(r.data.html.includes('<h2 id="hi">Hi</h2>') && r.data.html.includes('&lt;b&gt;'), 'editor preview');
+    r = await admin.req('DELETE', '/api/blog/' + post.id);
+    ok(r.status === 200 && (await anon.req('GET', '/blog/' + post.slug)).status === 404 && !fs.existsSync(path.join(tmp, 'uploads', 'media', ogFile)), 'delete removes the post and its photos');
 
     console.log('Admin sign-in from the server shell');
     const env = Object.assign({}, process.env, { DATA_DIR: path.join(tmp, 'data'), UPLOAD_DIR: path.join(tmp, 'uploads'), NODE_ENV: 'test' });

@@ -30,6 +30,7 @@ const SERVICES = [
   {
     slug: 'rooftop-solar-for-homes',
     nav: 'Homes',
+    short: 'Homes',
     type: 'Home',
     title: 'Home Rooftop Solar in Tamil Nadu — PM Surya Ghar Subsidy',
     description: 'Rooftop solar for your home with the PM Surya Ghar subsidy (up to ₹78,000), net-metering and EB paperwork handled by one local team. Free site survey.',
@@ -59,6 +60,7 @@ const SERVICES = [
   {
     slug: 'commercial-industrial-solar',
     nav: 'Business & industry',
+    short: 'Business & industry',
     type: 'Business',
     title: 'Commercial & Industrial Solar in Tamil Nadu',
     description: 'Rooftop and ground-mount solar for shops, offices, schools, hospitals, mills and factories in Tamil Nadu. Design, installation, approvals and O&M by one team.',
@@ -89,6 +91,7 @@ const SERVICES = [
   {
     slug: 'solar-water-pumps',
     nav: 'Farms & pumps',
+    short: 'Farms & pumps',
     type: 'Farm',
     title: 'Solar Water Pumps & Off-grid Solar for Farms, Tamil Nadu',
     description: 'Solar water pumps and off-grid solar for farms in Tamil Nadu — replace diesel, run borewell and surface pumps on sunlight, with installation and service by AVN Solar.',
@@ -116,6 +119,7 @@ const SERVICES = [
   {
     slug: 'solar-maintenance-amc',
     nav: 'Maintenance & AMC',
+    short: 'Maintenance',
     type: 'Home',
     title: 'Solar Panel Cleaning, Maintenance & AMC in Tamil Nadu',
     description: 'Solar panel cleaning, inverter and earthing checks, generation monitoring and annual maintenance contracts (AMC) for homes, businesses and farms across Tamil Nadu.',

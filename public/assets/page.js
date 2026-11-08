@@ -16,7 +16,7 @@ document.addEventListener('alpine:init', () => {
   }
 
   Alpine.data('page', () => ({
-    menu: false, scrolled: false, sending: false, sent: false, error: '',
+    menu: false, scrolled: false, sending: false, sent: false, error: '', copied: false,
     f: { name: '', phone: '', district: '', note: '', website: '' },
     init() {
       this.utm = readUtm();
@@ -24,6 +24,12 @@ document.addEventListener('alpine:init', () => {
       const onScroll = () => { if (this.scrolled !== window.scrollY > 8) this.scrolled = window.scrollY > 8; };
       window.addEventListener('scroll', onScroll, { passive: true });
       onScroll();
+    },
+    async copyLink() {
+      const url = location.origin + location.pathname;
+      try { await navigator.clipboard.writeText(url); } catch (e) { window.prompt('Copy this link', url); return; }
+      this.copied = true;
+      setTimeout(() => { this.copied = false; }, 2500);
     },
     async send() {
       const phone = String(this.f.phone).replace(/\D/g, '').slice(-10);

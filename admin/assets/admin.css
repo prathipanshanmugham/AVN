@@ -382,3 +382,32 @@ body{-webkit-tap-highlight-color:rgba(17,24,71,.08)}
 .gp-site small{font-size:12px;color:#4D5156}
 .gp-title{font-size:20px;line-height:1.3;color:#1A0DAB;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gp-desc{font-size:14px;line-height:1.58;color:#4D5156;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Blog editor */
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:14px}
+.post-item{flex-direction:row;align-items:center;gap:12px}
+.post-thumb{flex:none;width:64px;height:48px;border-radius:10px;background:#0E1542 url('/assets/logo.png') center/28px no-repeat;background-size:cover}
+.post-thumb:not([style*="url"]){background-size:28px}
+.post-txt{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.post-txt b{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.post-title{font-family:var(--display);font-weight:600;font-size:20px;min-height:52px}
+.slugrow{display:flex;align-items:center;gap:6px;min-width:0}
+.slugrow .muted{flex:none;font-size:14px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.slugrow .input{flex:1;min-width:0}
+.cover-wrap{display:flex;flex-direction:column;gap:10px}
+.cover-img{display:block;width:100%;max-height:360px;object-fit:cover;border-radius:16px;border:1px solid var(--line)}
+.mdbar{display:flex;flex-wrap:wrap;gap:6px;position:sticky;top:0;z-index:2;padding:6px 0;background:#fff}
+.mdbar .btn{min-width:44px}
+.mdtext{min-height:420px;font-size:16px;line-height:1.7;resize:vertical}
+.pubrow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+.prose-admin{max-width:720px;font-size:17px;line-height:1.75;color:var(--text2)}
+.prose-admin h2{margin:32px 0 10px;font-family:var(--display);font-size:24px;color:var(--ink)}
+.prose-admin h3{margin:24px 0 8px;font-size:20px;color:var(--ink)}
+.prose-admin p{margin:0 0 16px}
+.prose-admin ul,.prose-admin ol{padding-left:22px;margin:0 0 16px}
+.prose-admin img{max-width:100%;height:auto;border-radius:12px}
+.prose-admin blockquote{margin:16px 0;padding:12px 16px;border-left:4px solid var(--orange);background:#F7F9FD;border-radius:0 12px 12px 0}
+.prose-admin a{color:var(--blue)}
+.prose-admin table{border-collapse:collapse;width:100%}
+.prose-admin th,.prose-admin td{border:1px solid var(--line);padding:6px 10px;text-align:left}
+@media (max-width:900px){.mdbar{top:var(--mtop,60px)}}

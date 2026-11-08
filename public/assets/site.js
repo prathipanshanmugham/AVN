@@ -52,6 +52,7 @@
     { t: 'Savings calculator', ta: 'சேமிப்பு கணக்கீடு', href: '#calculator' },
     { t: 'Recent projects', ta: 'எங்கள் திட்டங்கள்', href: '#projects' },
     { t: 'Questions', ta: 'கேள்விகள்', href: '#faq' },
+    { t: 'Blog', ta: 'வலைப்பதிவு', href: '/blog' },
     { t: 'Free quote', ta: 'இலவச விலைப்பட்டியல்', href: '#contact' },
   ];
 

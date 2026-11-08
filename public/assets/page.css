@@ -7,7 +7,7 @@
 .pintro{margin:0;max-width:62ch;font-size:19px;color:#D6DCF2}
 .pctas{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
 .crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px;color:#AEB7DA}
-.crumbs a{color:#fff;text-decoration:none;font-weight:700}
+.crumbs a{display:inline-block;padding:11px 4px;margin:-11px -4px;color:#fff;text-decoration:none;font-weight:700}
 .crumbs a:hover{color:var(--accent)}
 
 .pbody{padding-top:72px;padding-bottom:72px}
@@ -65,3 +65,47 @@
   .pbody{padding:52px 18px}
   .pform{padding:20px 16px;border-radius:22px}
 }
+
+/* Blog list and articles */
+.btags{display:flex;flex-wrap:wrap;gap:8px}
+.btags a{display:inline-flex;align-items:center;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink);font-weight:700;font-size:15px;text-decoration:none}
+.btags a:hover{border-color:var(--ink)}
+.btags a[aria-current="page"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.bpager{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);font-weight:700}
+.bempty{display:flex;flex-direction:column;align-items:center;gap:12px;padding:48px 24px;border:1px dashed var(--line2,#C9D2E6);border-radius:24px;text-align:center}
+.bempty b{font-family:var(--display);font-size:22px}
+.bempty p{margin:0;max-width:52ch;color:var(--text2)}
+.bcta{background:var(--ground)}
+.bhero h1{max-width:24ch;font-size:clamp(30px,4.2vw,54px)}
+.bbyline{margin:0;color:#C9D0EC;font-size:16px}
+.bpreview{position:relative;z-index:60;padding:10px 16px;background:#FFE59A;color:#3B2A00;text-align:center;font-size:15px}
+.pcover{margin:0}
+.pcover img{display:block;width:100%;height:auto;border-radius:22px}
+.prose{font-size:18px;line-height:1.75;color:var(--text2);overflow-wrap:break-word}
+.prose>*:first-child{margin-top:0}
+.prose h2{margin:44px 0 12px;font-family:var(--display);font-weight:600;font-size:clamp(23px,2.4vw,30px);line-height:1.25;color:var(--ink);scroll-margin-top:calc(var(--head) + 16px)}
+.prose h3{margin:32px 0 10px;font-family:var(--display);font-weight:600;font-size:21px;line-height:1.3;color:var(--ink);scroll-margin-top:calc(var(--head) + 16px)}
+.prose h4,.prose h5,.prose h6{margin:26px 0 8px;font-size:18px;color:var(--ink)}
+.prose p{margin:0 0 18px}
+.prose ul,.prose ol{margin:0 0 18px;padding-left:24px}
+.prose li{margin:6px 0}
+.prose li::marker{color:var(--orange)}
+.prose a{color:var(--blue);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+.prose strong{color:var(--ink)}
+.prose blockquote{margin:24px 0;padding:16px 20px;border-left:4px solid var(--accent);border-radius:0 14px 14px 0;background:var(--ground);color:var(--ink)}
+.prose blockquote p:last-child{margin:0}
+.prose img{display:block;max-width:100%;height:auto;margin:24px 0;border-radius:16px}
+.prose hr{margin:36px 0;border:0;border-top:1px solid var(--line)}
+.prose code{padding:2px 6px;border-radius:6px;background:var(--ground);font-size:.9em}
+.prose .ptable{margin:0 0 20px;max-width:none}
+.prose .ptable td{font-family:inherit;font-weight:400}
+.bshare{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;padding-top:24px;border-top:1px solid var(--line);font-weight:700;color:var(--ink)}
+.bshare .btn{min-height:44px}
+.bshare .chat-ic{width:20px;height:20px}
+.bmore{background:var(--ground)}
+.bmore .wrap{display:flex;flex-direction:column;gap:28px}
+@media (max-width:600px){
+  .prose{font-size:17px}
+  .bpager .btn{padding:0 14px}
+}
+.bcta .pgrid{align-items:center}

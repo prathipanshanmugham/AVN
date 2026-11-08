@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Blog — AVN Workspace</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/admin/assets/app.js"></script>
+<script defer src="/admin/assets/blog.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="app">
+<aside id="side"></aside>
+<main class="main" x-data="blog" x-cloak @keydown.window.ctrl.s.prevent="cur && save()" @keydown.window.meta.s.prevent="cur && save()">
+  <div class="topbar">
+    <div><h1 class="title">Blog</h1><div class="sub">Articles for <a href="/blog" target="_blank" rel="noopener">avnsolar.in/blog</a> — save drafts, schedule or publish. Every published post is added to Google’s sitemap.</div></div>
+    <button class="btn primary" type="button" @click="create()" :disabled="creating"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"/></svg>New post</button>
+  </div>
+
+  <div class="split md" :class="detailOpen && 'detail-open'">
+    <div class="list stack">
+      <label class="search" style="min-width:0"><span class="sr-only">Search posts</span><input type="search" placeholder="Search titles and topics" x-model="q"></label>
+      <div class="chips" role="group" aria-label="Filter by state">
+        <template x-for="s in ['All', 'Published', 'Scheduled', 'Draft']" :key="s"><button type="button" class="chip" :class="filter === s && 'on'" :aria-pressed="filter === s" @click="filter = s" x-text="s"></button></template>
+      </div>
+      <template x-for="x in list" :key="x.id">
+        <button type="button" class="item post-item" :class="cur && cur.id === x.id && 'on'" @click="open(x.id)">
+          <span class="post-thumb" :style="x.cover ? 'background-image:url(' + x.cover + ')' : ''" aria-hidden="true"></span>
+          <span class="post-txt">
+            <b x-text="x.title"></b>
+            <span class="row between small" style="flex-wrap:nowrap"><span class="muted" x-text="x.publishedAt ? day(x.publishedAt) : 'Edited ' + day(x.updatedAt)"></span><span class="badge" :class="badge(x.state)" x-text="x.state"></span></span>
+          </span>
+        </button>
+      </template>
+      <div class="empty" x-show="loaded && !posts.length">No posts yet. Write the first one — answers to questions customers ask you every day make the best articles.</div>
+    </div>
+
+    <section class="detail stack" aria-label="Post">
+      <button type="button" class="btn sm back-btn" style="align-self:flex-start" @click="back()">← All posts</button>
+      <template x-if="!cur"><div class="empty">Select a post, or start a new one.</div></template>
+      <template x-if="cur">
+        <form class="stack" style="gap:16px" @submit.prevent="save()" @input="dirty = true">
+          <!-- Title and address -->
+          <div class="card stack">
+            <div class="row between" style="align-items:center">
+              <span class="row" style="gap:8px"><span class="badge" :class="badge(cur.state)" x-text="cur.state"></span><span class="small muted" x-text="stateLine"></span></span>
+              <span class="row" style="gap:8px">
+                <a class="btn sm" :href="'/blog/' + saved.slug" target="_blank" rel="noopener" x-text="cur.state === 'Published' ? 'View on site ↗' : 'Preview ↗'"></a>
+                <button class="btn sm danger" type="button" @click="remove()">Delete</button>
+              </span>
+            </div>
+            <label class="field">Title <small x-text="cur.title.length + ' / 160'"></small>
+              <input class="input post-title" x-model="cur.title" maxlength="160" @input="titleChanged()" required></label>
+            <label class="field">Web address <small>small letters, numbers and hyphens</small>
+              <span class="slugrow"><span class="muted" x-text="host + '/blog/'"></span><input class="input" x-model="cur.slug" maxlength="90" @input="slugTouched = true" spellcheck="false" autocapitalize="off"></span></label>
+            <p class="small muted" x-show="cur.state === 'Published' && cur.slug !== saved.slug" style="margin:0">Changing the address of a live post breaks links already shared on WhatsApp or found on Google.</p>
+          </div>
+
+          <!-- Cover -->
+          <div class="card stack">
+            <div class="row between"><h3>Cover photo</h3><span class="small muted">Shown at the top of the post, on the blog list and when shared</span></div>
+            <template x-if="cur.cover">
+              <div class="cover-wrap">
+                <img :src="cur.cover" :alt="cur.coverAlt" class="cover-img">
+                <div class="row" style="gap:8px">
+                  <label class="btn sm">Replace<input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="uploadCover($event)"></label>
+                  <button class="btn sm danger" type="button" @click="removeCover()">Remove</button>
+                </div>
+              </div>
+            </template>
+            <template x-if="!cur.cover">
+              <label class="drop" :class="hot && 'hot'" @dragover.prevent="hot = true" @dragleave="hot = false" @drop.prevent="hot = false; uploadCover($event)">
+                <b x-text="uploading ? 'Uploading…' : 'Drop a photo here, or click to choose'"></b>
+                <span class="small muted">A wide landscape photo works best (at least 1600 px). It is resized and compressed for you.</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="uploadCover($event)">
+              </label>
+            </template>
+            <label class="field">Describe the photo <small>for Google and screen readers</small><input class="input" x-model="cur.coverAlt" maxlength="200" placeholder="e.g. 5 kW rooftop solar system on a home in Erode"></label>
+          </div>
+
+          <!-- Article -->
+          <div class="card stack">
+            <div class="row between" style="align-items:center">
+              <h3>Article</h3>
+              <div class="tabs" role="tablist" style="flex:0 0 220px"><button type="button" role="tab" :class="tab === 'write' && 'on'" :aria-selected="tab === 'write'" @click="tab = 'write'">Write</button><button type="button" role="tab" :class="tab === 'preview' && 'on'" :aria-selected="tab === 'preview'" @click="showPreview()">Preview</button></div>
+            </div>
+            <div x-show="tab === 'write'" class="stack" style="gap:8px">
+              <div class="mdbar" role="toolbar" aria-label="Formatting">
+                <button type="button" class="btn sm" @click="line('## ')" title="Section heading">H2</button>
+                <button type="button" class="btn sm" @click="line('### ')" title="Smaller heading">H3</button>
+                <button type="button" class="btn sm" @click="wrap('**', '**', 'bold text')" title="Bold"><b>B</b></button>
+                <button type="button" class="btn sm" @click="wrap('*', '*', 'italic text')" title="Italic"><i>I</i></button>
+                <button type="button" class="btn sm" @click="link()" title="Link">Link</button>
+                <button type="button" class="btn sm" @click="line('- ')" title="Bullet list">• List</button>
+                <button type="button" class="btn sm" @click="line('1. ')" title="Numbered list">1. List</button>
+                <button type="button" class="btn sm" @click="line('> ')" title="Highlighted note">Quote</button>
+                <label class="btn sm" title="Photo inside the article"><span x-text="imgUploading ? 'Uploading…' : 'Photo'"></span><input type="file" accept="image/jpeg,image/png,image/webp" class="sr-only" @change="insertImage($event)"></label>
+              </div>
+              <textarea class="textarea mdtext" x-ref="body" x-model="cur.body" rows="22" spellcheck="true" placeholder="Start writing… Use the buttons above, or type ## for a section heading, **bold**, and - for a list."></textarea>
+              <div class="small muted" x-text="words + ' words · about ' + minutes + ' min read'"></div>
+            </div>
+            <div x-show="tab === 'preview'">
+              <div class="prose-admin" x-html="previewHtml"></div>
+            </div>
+          </div>
+
+          <!-- Summary, topics, byline -->
+          <div class="card stack">
+            <h3>Summary &amp; topics</h3>
+            <label class="field">Short summary <small x-text="(cur.excerpt || '').length + ' / 300 — shown on the blog list; left blank, the opening lines are used'"></small>
+              <textarea class="textarea" rows="3" maxlength="300" x-model="cur.excerpt"></textarea></label>
+            <div class="grid2">
+              <label class="field">Topics <small>comma separated, e.g. Subsidy, Homes</small><input class="input" x-model="cur.tags" list="blogtags" placeholder="Subsidy, Homes"></label>
+              <label class="field">Written by <small>shown under the title</small><input class="input" x-model="cur.authorName" maxlength="80" placeholder="AVN Solar team"></label>
+            </div>
+            <datalist id="blogtags"><template x-for="t in allTags" :key="t"><option :value="t"></option></template></datalist>
+          </div>
+
+          <!-- Search & sharing -->
+          <div class="card stack">
+            <div><h3>Google &amp; sharing</h3><span class="small muted">Optional — when blank, the title and summary are used.</span></div>
+            <div class="gpreview" aria-label="Google result preview">
+              <span class="gp-site"><img src="/favicon.ico" alt="" width="18" height="18"><span><b>AVN Solar</b><small x-text="host + ' › blog › ' + cur.slug"></small></span></span>
+              <span class="gp-title" x-text="(cur.metaTitle || cur.title) + ' | AVN Solar'"></span>
+              <span class="gp-desc" x-text="cur.metaDescription || cur.excerpt || plain.slice(0, 158)"></span>
+            </div>
+            <label class="field">Google title <small x-text="(cur.metaTitle || '').length + ' / 60 suggested'"></small><input class="input" x-model="cur.metaTitle" maxlength="90" :placeholder="cur.title"></label>
+            <label class="field">Google description <small x-text="(cur.metaDescription || '').length + ' / 155 suggested'"></small><textarea class="textarea" rows="2" maxlength="220" x-model="cur.metaDescription"></textarea></label>
+          </div>
+
+          <!-- Publishing -->
+          <div class="card stack">
+            <h3>Publishing</h3>
+            <div class="pubrow">
+              <template x-if="cur.state !== 'Published'">
+                <button class="btn primary" type="button" @click="publish()" :disabled="saving">Publish now</button>
+              </template>
+              <label class="field" style="flex:1 1 220px">Or schedule for
+                <span class="row" style="flex-wrap:nowrap;gap:8px"><input class="input" type="datetime-local" x-model="when"><button class="btn" type="button" @click="schedule()" :disabled="!when || saving">Schedule</button></span></label>
+              <template x-if="cur.state !== 'Draft'">
+                <button class="btn" type="button" @click="unpublish()" :disabled="saving" x-text="cur.state === 'Scheduled' ? 'Cancel schedule' : 'Unpublish'"></button>
+              </template>
+            </div>
+            <p class="small muted" style="margin:0">Published posts appear on the blog, in the homepage’s “From the blog” section and in the sitemap Google reads. Scheduled posts go live by themselves at the set time.</p>
+          </div>
+
+          <div class="savebar" :class="dirty && 'on'">
+            <span x-text="dirty ? 'Unsaved changes' : 'All changes saved'"></span>
+            <button class="btn dark" type="submit" :disabled="saving" x-text="saving ? 'Saving…' : (cur.state === 'Published' ? 'Update post' : 'Save draft')"></button>
+          </div>
+        </form>
+      </template>
+    </section>
+  </div>
+</main>
+</div>
+</body>
+</html>

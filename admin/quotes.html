@@ -151,9 +151,9 @@
                 <label class="field">Expected subsidy (₹) <small>shown as information, not deducted</small>
                   <span class="row" style="flex-wrap:nowrap"><input class="input" type="number" step="any" min="0" x-model="cur.subsidy"><button class="btn sm" type="button" @click="cur.subsidy = QuoteCalc.subsidyFor(cur.kwp); dirty = true" title="PM Surya Ghar central subsidy for homes">PM Surya Ghar</button></span></label>
                 <div class="qgroups" x-show="cur.format === 'grouped'">
-                  <div class="small muted" style="font-weight:700;margin-bottom:4px">As printed (grouped)</div>
+                  <div class="small muted" style="font-weight:700;margin-bottom:4px">As printed (grouped) — no prices per group, only the totals</div>
                   <template x-for="(g, gi) in t.groups" :key="gi">
-                    <div class="qgline"><span><b x-text="g.name"></b><small x-text="g.single ? (g.items[0].hsn || '') : g.items.length + ' items · ' + g.hsn.join(', ')"></small></span><b x-text="QuoteCalc.inr(g.taxable, true)"></b></div>
+                    <div class="qgline"><span><b x-text="g.name"></b><small x-text="g.single ? (g.items[0].hsn || '') : g.items.length + ' items · ' + g.hsn.join(', ')"></small></span></div>
                   </template>
                 </div>
               </div>
@@ -170,7 +170,7 @@
             </div>
 
             <div class="rowline" style="min-height:44px;border:0;padding:0">
-              <span><b>Print the HSN/SAC tax summary</b><br><span class="small muted">The CGST / SGST or IGST totals always print; this adds the code-wise table.</span></span>
+              <span><b>Print the HSN/SAC tax summary</b><br><span class="small muted">Adds the code-wise tax table to the item-wise format. The grouped format leaves it off (it would show values per code); the CGST / SGST or IGST totals always print.</span></span>
               <button type="button" class="switch" role="switch" :aria-checked="(!!cur.taxSummary).toString()" aria-label="Print the HSN/SAC tax summary" @click="cur.taxSummary = !cur.taxSummary; dirty = true"></button>
             </div>
             <details class="hsnsum">

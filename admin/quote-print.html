@@ -86,12 +86,10 @@
         </tbody>
       </table>
 
-      <!-- Grouped: one price per group, the components listed under it -->
+      <!-- Grouped: components listed under each group, no prices per group; only the totals are priced -->
       <table class="lines grouped" x-show="view === 'grouped'">
         <thead>
-          <tr><th class="n">#</th><th>Description</th><th>HSN/SAC</th>
-            <th class="r" x-text="t.itemised ? 'Taxable value (₹)' : 'Amount (₹)'"></th>
-            <th class="r" x-show="t.itemised">GST</th><th class="r" x-show="t.itemised">Amount (₹)</th></tr>
+          <tr><th class="n">#</th><th>Description</th><th>HSN/SAC</th><th class="r" x-show="t.itemised">GST</th></tr>
         </thead>
         <tbody>
           <template x-for="(g, gi) in t.groups" :key="gi">
@@ -100,17 +98,19 @@
               <td class="desc">
                 <b x-text="g.name"></b>
                 <template x-if="g.single"><small class="qty" x-text="num(g.items[0].qty) + (g.items[0].unit ? ' ' + g.items[0].unit : '')"></small></template>
-                <template x-if="!g.single"><ul><template x-for="(it, ii) in g.items" :key="ii"><li><span x-text="it.desc"></span> <small class="qty" x-text="'· ' + num(it.qty) + (it.unit ? ' ' + it.unit : '') + (it.hsn ? ' · ' + it.hsn : '')"></small></li></template></ul></template>
+                <template x-if="!g.single"><ul><template x-for="(it, ii) in g.items" :key="ii"><li><span x-text="it.desc"></span> <small class="qty" x-text="'· ' + num(it.qty) + (it.unit ? ' ' + it.unit : '')"></small></li></template></ul></template>
               </td>
               <td class="hsn" x-text="g.hsn.join(', ')"></td>
-              <td class="r" x-text="money(t.itemised ? g.taxable : g.amount)"></td>
-              <td class="r nw" x-show="t.itemised"><span x-text="g.rates.map((r) => r + '%').join(' / ')"></span><small x-text="money(g.tax)"></small></td>
-              <td class="r" x-show="t.itemised" x-text="money(g.total)"></td>
+              <td class="r nw" x-show="t.itemised" x-text="g.rates.map((r) => r + '%').join(' / ')"></td>
             </tr>
           </template>
         </tbody>
+        <tfoot>
+          <tr class="gtotal"><td></td><td><b>Total value of the system</b> <small x-text="t.discount ? '(after discount, before GST)' : '(before GST)'"></small></td>
+            <td class="r" :colspan="t.itemised ? 2 : 1"><b x-text="'₹' + money(t.taxable)"></b></td></tr>
+        </tfoot>
       </table>
-      <p class="small" x-show="t.itemised && t.discount" x-text="'Taxable values are after the discount of ₹' + money(t.discount) + ', shared across the lines in proportion to their value.'"></p>
+      <p class="small" x-show="view === 'itemwise' && t.itemised && t.discount" x-text="'Taxable values are after the discount of ₹' + money(t.discount) + ', shared across the lines in proportion to their value.'"></p>
 
       <section class="sum">
         <div class="words">

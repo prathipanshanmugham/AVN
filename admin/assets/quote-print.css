@@ -39,6 +39,9 @@ table.lines,table.bom{width:100%;border-collapse:collapse}
 .lines.grouped li{margin:1px 0}
 .lines.grouped small.qty{display:inline;color:var(--muted)}
 .lines.grouped td>small.qty{display:block}
+.lines.grouped tfoot td{padding-top:10px;padding-bottom:10px;border-top:2px solid var(--ink);background:#F7F9FD;font-size:13px}
+.lines.grouped tfoot small{display:inline;color:var(--muted)}
+.lines .gtotal{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .taxsum h3{margin-bottom:6px}
 table.hsn-table{width:100%;border-collapse:collapse;font-size:11.5px}
 .hsn-table th{background:#EEF2F9;color:var(--ink);font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;padding:5px 7px;border:1px solid var(--line);text-align:left}

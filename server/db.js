@@ -14,8 +14,8 @@ db.pragma('foreign_keys = ON');
 db.pragma('busy_timeout = 5000');
 
 // Order matters: the first module a user can open is their landing page (admins land on the dashboard).
-const MODULES = ['dashboard', 'crm', 'quotes', 'projects', 'calendar', 'website', 'clients'];
-const ADMIN_ONLY_BY_DEFAULT = ['website', 'dashboard'];
+const MODULES = ['dashboard', 'crm', 'quotes', 'projects', 'calendar', 'website', 'blog', 'clients'];
+const ADMIN_ONLY_BY_DEFAULT = ['website', 'dashboard', 'blog'];
 const SYSTEM_TYPES = ['On-grid', 'Hybrid', 'Off-grid'];
 const STAGES_LEAD = ['New lead', 'Site survey', 'Quotation sent', 'Negotiation', 'Won', 'Lost'];
 const STAGES_PROJECT = ['Survey', 'Design', 'Procurement', 'Installation', 'Approvals', 'Switch-on'];
@@ -413,6 +413,34 @@ const MIGRATIONS = [
   () => {
     const cols = db.prepare('PRAGMA table_info(quotes)').all().map((c) => c.name);
     if (!cols.includes('tax_summary')) db.exec('ALTER TABLE quotes ADD COLUMN tax_summary INTEGER NOT NULL DEFAULT 1');
+  },
+  // 5: blog posts (Markdown). Live when published and the publish time has passed.
+  () => {
+    db.exec(`CREATE TABLE IF NOT EXISTS posts (
+      id INTEGER PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      title TEXT NOT NULL,
+      excerpt TEXT,
+      body TEXT NOT NULL DEFAULT '',
+      cover_name TEXT,
+      cover_og TEXT,
+      cover_alt TEXT,
+      tags TEXT,
+      meta_title TEXT,
+      meta_description TEXT,
+      author_name TEXT,
+      status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+      published_at TEXT,
+      created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_posts_live ON posts(status, published_at)');
+    // Three starter articles as drafts, for the team to review, add a cover photo and publish.
+    if (!db.prepare('SELECT COUNT(*) n FROM posts').get().n) {
+      const add = db.prepare("INSERT OR IGNORE INTO posts (slug, title, excerpt, body, tags, author_name) VALUES (?,?,?,?,?,'AVN Solar team')");
+      require('./blog-starter').forEach((p) => add.run(p.slug, p.title, p.excerpt, p.body, p.tags));
+    }
   },
 ];
 

@@ -8,14 +8,15 @@
     calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10 H21 M8 3 V7 M16 3 V7"/>',
     clients: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20 C2.5 16.4 5.4 14 9 14 C12.6 14 15.5 16.4 15.5 20"/><path d="M16 4.5 A3.5 3.5 0 0 1 16 11.5 M18 14.5 C20.2 15.2 21.5 17.2 21.5 20"/>',
     website: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 15 L8 10 L13 15 L16 12 L21 17"/><circle cx="16" cy="8.5" r="1.5"/>',
+    blog: '<path d="M5 4 H15 L19 8 V20 H5 Z"/><path d="M15 4 V8 H19"/><path d="M8.5 12 H15.5 M8.5 15 H15.5 M8.5 18 H12.5"/>',
     settings: '<path d="M4 6 H13 M17 6 H20 M4 12 H7 M11 12 H20 M4 18 H15 M19 18 H20"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
     account: '<circle cx="12" cy="8" r="4"/><path d="M4 21 C4 16.6 7.6 14 12 14 C16.4 14 20 16.6 20 21"/>',
     more: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
     menu: '<path d="M4 7 H20 M4 12 H20 M4 17 H14"/>',
     close: '<path d="M6 6 L18 18 M18 6 L6 18"/>',
   };
-  const TITLES = { dashboard: 'CEO Dashboard', crm: 'CRM', quotes: 'Quotations', projects: 'Projects', calendar: 'Calendar', clients: 'Clients', website: 'Website', settings: 'Settings', account: 'My account' };
-  const SHORT = { dashboard: 'Dashboard', crm: 'CRM', quotes: 'Quotes', projects: 'Projects', calendar: 'Calendar', clients: 'Clients', website: 'Website', settings: 'Settings' };
+  const TITLES = { dashboard: 'CEO Dashboard', crm: 'CRM', quotes: 'Quotations', projects: 'Projects', calendar: 'Calendar', clients: 'Clients', website: 'Website', blog: 'Blog', settings: 'Settings', account: 'My account' };
+  const SHORT = { dashboard: 'Dashboard', crm: 'CRM', quotes: 'Quotes', projects: 'Projects', calendar: 'Calendar', clients: 'Clients', website: 'Website', blog: 'Blog', settings: 'Settings' };
   const svg = (k) => '<svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[k] + '</svg>';
   const NAV = [
     { key: 'dashboard', label: 'CEO Dashboard', perm: 'dashboard' },
@@ -25,6 +26,7 @@
     { key: 'calendar', label: 'Calendar', perm: 'calendar' },
     { key: 'clients', label: 'Clients', perm: 'clients' },
     { key: 'website', label: 'Website', perm: 'website' },
+    { key: 'blog', label: 'Blog', perm: 'blog' },
     { key: 'settings', label: 'Settings', perm: null },
   ];
   const page = location.pathname.split('/')[2] || '';

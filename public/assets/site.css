@@ -449,3 +449,25 @@ input[type=range]{width:100%;height:44px;accent-color:var(--accent);cursor:point
 }
 @media (max-width:430px){.cta-long{display:none}.cta-short{display:inline}}
 @media (max-width:350px){.header .logo b{font-size:15px}.header .logo img{width:38px;height:38px}}
+
+/* Blog cards — homepage "From the blog", /blog and "Keep reading" */
+.bhome .wrap,.blist .wrap{display:flex;flex-direction:column;gap:32px}
+.bhome-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.bhome-head .h2{margin:6px 0 0}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:24px}
+.bcard{position:relative;display:flex;flex-direction:column;background:#fff;border:1px solid var(--line);border-radius:22px;overflow:hidden;transition:transform .25s ease,box-shadow .25s ease}
+.bcard:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(17,24,71,.12)}
+.bcard:focus-within{box-shadow:0 0 0 3px var(--accent)}
+.bimg{display:block;aspect-ratio:16/9;overflow:hidden;background:var(--ground)}
+.bimg img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+.bcard:hover .bimg img{transform:scale(1.04)}
+.bph{display:flex;width:100%;height:100%;align-items:center;justify-content:center;background:radial-gradient(420px 220px at 80% 0%,rgba(255,193,46,.35),transparent 60%),var(--navy)}
+.bph img{width:72px!important;height:72px!important;object-fit:contain;padding:6px;border-radius:50%;background:#fff;transform:none!important}
+.bcopy{display:flex;flex-direction:column;gap:10px;padding:20px 22px 24px}
+.bmeta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:14px;color:var(--muted)}
+.btag{padding:3px 10px;border-radius:999px;background:#FFF3D1;color:#7A5200;font-weight:700;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+.bcard h2,.bcard h3{margin:0;font-family:var(--display);font-weight:600;font-size:20px;line-height:1.3}
+.bcard h2 a,.bcard h3 a{color:var(--ink);text-decoration:none}
+.bcard h2 a::after,.bcard h3 a::after{content:'';position:absolute;inset:0}
+.bcard h2 a:focus-visible,.bcard h3 a:focus-visible{outline:none}
+.bcard p{margin:0;color:var(--text2);font-size:16px}
