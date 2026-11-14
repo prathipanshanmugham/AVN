@@ -23,13 +23,13 @@
   </div>
   <div class="card stack" style="max-width:520px">
     <template x-if="$store.app.user.mustChange">
-      <div class="ok" style="background:var(--amber-bg);color:var(--amber-fg)">You are signed in with a temporary password. Set your own password to continue.</div>
+      <div class="ok" style="background:var(--amber-bg);color:var(--amber-fg)">You are signed in with a temporary password. Type that temporary password below, then choose your own. Lost it? Ask another admin to reset it, or run the reset command on the server.</div>
     </template>
     <h2 class="h2">Change password</h2>
     <div class="error" x-show="error" x-text="error" role="alert"></div>
     <form class="stack" @submit.prevent="save" novalidate>
       <input type="text" autocomplete="username" :value="$store.app.user.email || $store.app.user.username" hidden aria-hidden="true">
-      <label class="field">Current password
+      <label class="field"><span x-text="$store.app.user.mustChange ? 'Temporary password (the one you signed in with)' : 'Current password'">Current password</span>
         <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="current" autocomplete="current-password" @input="error = ''"><button type="button" class="pweye" @click="show = !show" :aria-label="show ? 'Hide passwords' : 'Show passwords'" x-text="show ? 'Hide' : 'Show'"></button></span></label>
       <label class="field">New password <small>at least 8 characters</small>
         <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="next" autocomplete="new-password" @input="error = ''"></span></label>

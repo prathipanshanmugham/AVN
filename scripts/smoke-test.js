@@ -117,6 +117,8 @@ async function main() {
     ok(r.status === 400 && /current password is not right/.test(r.data.error), 'wrong current password explained');
     r = await admin.req('POST', '/api/auth/password', { current: ADMIN_PW, next: 'Admin-New-Pass-2026' });
     ok(r.status === 200, 'admin password changed');
+    r = await admin.req('POST', '/api/users/' + (await admin.req('GET', '/api/auth/me')).data.user.id + '/reset-password');
+    ok(r.status === 400 && /My account/.test(r.data.error), 'an admin cannot reset their own password from Users (use My account)');
     r = await admin.req('GET', '/api/leads');
     ok(r.status === 200 && r.data.leads.some((l) => l.name === 'Web Visitor' && l.source === 'Website'), 'website enquiry is in the CRM');
 

@@ -117,6 +117,8 @@ router.patch('/users/:id', requireAdmin, (req, res) => {
 router.post('/users/:id/reset-password', requireAdmin, (req, res) => {
   const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
   if (!u) throw notFound();
+  // Resetting your own account here would lock you into a temporary password; use My account instead.
+  if (u.id === req.user.id) throw bad('To change your own password, use My account → Change password');
   const temp = generatePassword();
   db.prepare('UPDATE users SET password_hash = ?, must_change = 1 WHERE id = ?').run(hashPassword(temp), u.id);
   res.json({ tempPassword: temp });
