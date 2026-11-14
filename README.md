@@ -29,6 +29,14 @@ Every website enquiry (quote wizard, offer popup, calculator, WhatsApp) lands in
   - **Lead emails** — recipients and SMTP server (Gmail app password, Hostinger mail, etc.), with a "Send test email" button. The SMTP password is never sent back to the browser.
   - **Quotations & bank** — ₹ per kWp rates, GST mode, numbering, module/inverter makes, terms, bank and UPI details.
 
+## Signing in (staff and customers)
+
+- **New people get a sign-in link, not a password.** Settings → Users → Add user (or Clients → New client login) shows a one-time link with **Send on WhatsApp**, Copy, and — when the person has an email and email is set up — it is emailed too. They tap it, tap **Continue**, choose a password, and they are in.
+- **Forgot password?** on both sign-in pages: staff get a 30-minute link by email; customers get it by email if their account has one, plus a one-tap WhatsApp message to AVN. Admins can send a fresh link any time (Users → **Sign-in link**, Clients → **Portal link**); a new link cancels older ones, and each works once (welcome 7 days, others 2 days).
+- **Keep me signed in on this device** (on by default) keeps people signed in for 30 days; otherwise 12 hours.
+- Typing a password for someone still works (leave the field blank to use a link). First sign-in never asks for the temporary password again.
+- Server fallback for the admin: `sudo -u avn npm run admin:set -- admin@avnsolar.in` prints a new password.
+
 ## Search engines (SEO)
 
 - Service pages with their own text and quote form: `/rooftop-solar-for-homes`, `/commercial-industrial-solar`, `/solar-water-pumps`, `/solar-maintenance-amc` (content in `server/content.js`).

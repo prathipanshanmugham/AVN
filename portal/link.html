@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Sign in — AVN Solar customer portal</title>
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=Unbounded:wght@600;700&display=swap">
+<link rel="stylesheet" href="/admin/assets/admin.css">
+<script defer src="/portal/assets/portal.js"></script>
+<script defer src="/vendor/alpine.js"></script>
+</head>
+<body>
+<div class="auth" style="background:#F4F7FC">
+  <div class="modal auth-card" x-data="portalLink" x-cloak style="border:1px solid var(--line)">
+    <a href="/" class="row" style="text-decoration:none;color:var(--ink)"><img src="/assets/logo.png" alt="AVN Solar logo" width="48" height="48" style="object-fit:contain"><b style="font-family:var(--display);font-size:18px">AVN Solar</b></a>
+    <template x-if="state === 'loading'"><p class="muted" style="margin:0">Checking your link…</p></template>
+    <template x-if="state === 'ready'">
+      <div class="stack">
+        <h1 class="title" style="font-size:24px" x-text="'Hello ' + first + '!'"></h1>
+        <p style="margin:0" x-text="purpose === 'welcome' ? 'Your AVN Solar customer portal is ready. Tap Continue, then choose your password — that’s it.' : 'Tap Continue to sign in, then choose a new password.'"></p>
+        <div class="error" x-show="error" x-text="error" role="alert"></div>
+        <label class="check"><input type="checkbox" x-model="remember"> Keep me signed in on this device</label>
+        <button class="btn dark big" type="button" @click="go()" :disabled="busy" x-text="busy ? 'Signing in…' : 'Continue'">Continue</button>
+      </div>
+    </template>
+    <template x-if="state === 'bad'">
+      <div class="stack">
+        <h1 class="title" style="font-size:24px">This link can’t be used</h1>
+        <p style="margin:0" x-text="error"></p>
+        <a class="btn dark big" href="/portal/login">Go to customer login</a>
+      </div>
+    </template>
+  </div>
+</div>
+</body>
+</html>

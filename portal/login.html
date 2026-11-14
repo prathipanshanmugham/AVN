@@ -15,23 +15,50 @@
 </head>
 <body>
 <div class="auth" style="background:#F4F7FC">
-  <form class="modal" x-data="portalLogin" @submit.prevent="submit" x-cloak style="border:1px solid var(--line)">
+  <div class="modal auth-card" x-data="portalLogin" x-cloak style="border:1px solid var(--line)">
     <a href="/" class="row" style="text-decoration:none;color:var(--ink)"><img src="/assets/logo.png" alt="AVN Solar logo" width="48" height="48" style="object-fit:contain"><b style="font-family:var(--display);font-size:18px">AVN Solar</b></a>
-    <div>
-      <h1 class="title" style="font-size:24px">Customer login</h1>
-      <p class="muted" style="margin:4px 0 0">Track your installation, download documents and raise service requests.</p>
+
+    <form class="stack" x-show="view === 'signin'" @submit.prevent="submit" novalidate>
+      <div>
+        <h1 class="title" style="font-size:24px">Customer login</h1>
+        <p class="muted" style="margin:4px 0 0">Track your installation, download documents and raise service requests.</p>
+      </div>
+      <div class="ok" x-show="notice" x-text="notice" role="status"></div>
+      <div class="error" x-show="error" x-text="error" role="alert"></div>
+      <label class="field">Mobile number <small>or Customer ID</small>
+        <input class="input" x-model="login" placeholder="98765 43210" autocomplete="username" inputmode="tel" @input="error = ''" x-ref="login">
+      </label>
+      <div class="field">
+        <span class="row between" style="width:100%;flex-wrap:nowrap"><label for="ppw">Password</label><button type="button" class="linkbtn" @click="openForgot()">Forgot password?</button></span>
+        <span class="pwbox"><input id="ppw" class="input" :type="show ? 'text' : 'password'" x-model="password" autocomplete="current-password" @input="error = ''" x-ref="pw"><button type="button" class="pweye" @click="show = !show" :aria-label="show ? 'Hide password' : 'Show password'" x-text="show ? 'Hide' : 'Show'"></button></span>
+      </div>
+      <label class="check"><input type="checkbox" x-model="remember"> Keep me signed in on this device</label>
+      <button class="btn dark big" type="submit" :disabled="busy" x-text="busy ? 'Signing in…' : 'Sign in'">Sign in</button>
+      <p class="small muted" style="margin:0">First time? Use the link AVN sent you on WhatsApp — it signs you in and lets you choose a password.</p>
+      <a href="/#contact" class="small" style="font-weight:700">New to AVN? Book a free site survey</a>
+    </form>
+
+    <form class="stack" x-show="view === 'forgot'" @submit.prevent="sendLink" novalidate>
+      <div>
+        <h1 class="title" style="font-size:24px">Get a sign-in link</h1>
+        <p class="muted" style="margin:4px 0 0">Enter your mobile number or Customer ID. We’ll send a link that signs you in, then you choose a new password.</p>
+      </div>
+      <div class="error" x-show="error" x-text="error" role="alert"></div>
+      <label class="field">Mobile number <small>or Customer ID</small>
+        <input class="input" x-model="login" inputmode="tel" autocomplete="username" @input="error = ''" x-ref="flogin">
+      </label>
+      <button class="btn dark big" type="submit" :disabled="busy" x-text="busy ? 'Sending…' : 'Send me a sign-in link'">Send me a sign-in link</button>
+      <button type="button" class="linkbtn" style="align-self:center" @click="back()">← Back to sign-in</button>
+    </form>
+
+    <div class="stack" x-show="view === 'sent'">
+      <h1 class="title" style="font-size:24px" x-text="emailOn ? 'Check your email — or WhatsApp us' : 'Get a new link on WhatsApp'">Get a new link on WhatsApp</h1>
+      <p style="margin:0" x-show="emailOn">If your account has an email address, we’ve sent a sign-in link to it. It works once, for 30 minutes.</p>
+      <p style="margin:0">Message us on WhatsApp and we’ll send you a sign-in link right away.</p>
+      <a class="btn big" style="background:#1E8E5A;color:#fff;border-color:#1E8E5A" :href="waLink" target="_blank" rel="noopener" x-show="wa">WhatsApp AVN Solar</a>
+      <button type="button" class="btn big" @click="back()">Back to sign-in</button>
     </div>
-    <div class="error" x-show="error" x-text="error" role="alert"></div>
-    <label class="field">Customer ID or mobile number
-      <input class="input" x-model="login" placeholder="AVN-2026-0001 or 98765 43210" autocomplete="username" required autofocus>
-    </label>
-    <label class="field">Password
-      <input class="input" type="password" x-model="password" autocomplete="current-password" required>
-    </label>
-    <button class="btn dark" type="submit" :disabled="busy" style="min-height:52px;font-size:16px" x-text="busy ? 'Signing in…' : 'Sign in'"></button>
-    <p class="small muted" style="margin:0">Your login details are shared by the AVN team when your project starts. Forgot your password? Call or WhatsApp us and we’ll reset it.</p>
-    <a href="/#contact" class="small" style="font-weight:700">New to AVN? Book a free site survey</a>
-  </form>
+  </div>
 </div>
 </body>
 </html>

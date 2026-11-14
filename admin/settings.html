@@ -42,7 +42,7 @@
                   <span class="badge red" x-show="!u.active">Disabled</span><span class="badge amber" x-show="u.active && u.mustChange">Temporary password</span>
                   <div class="small muted" x-text="'@' + u.username + (u.email ? ' · ' + u.email : '') + ' · ' + (u.lastLogin ? 'last sign-in ' + AVN.when(u.lastLogin) : 'never signed in')"></div></div>
                 <div class="row actions"><button class="btn sm" type="button" @click="openUser(u)">Edit</button>
-                  <template x-if="u.id !== $store.app.user.id"><button class="btn sm" type="button" @click="resetUser(u)">Reset password</button></template>
+                  <template x-if="u.id !== $store.app.user.id"><button class="btn sm" type="button" @click="linkUser(u)" :disabled="!u.active" title="A one-time link that signs them in to choose a password">Sign-in link</button></template>
                   <template x-if="u.id === $store.app.user.id"><a class="btn sm" href="/admin/account">Change my password</a></template></div>
               </div>
             </template>
@@ -171,11 +171,22 @@
         <label class="field">Username <small>for signing in</small><input class="input" x-model="uform.username" :disabled="!!uform.id" required pattern="[A-Za-z0-9._\-]{3,40}"></label>
         <label class="field">Email <small>optional</small><input class="input" type="email" x-model="uform.email"></label>
         <label class="field">Role<select class="select" x-model="uform.role"><option value="staff">Staff</option><option value="admin">Admin</option></select></label>
-        <label class="field" x-show="!uform.id">Password <small>blank = generate one</small><input class="input" x-model="uform.password" minlength="10" autocomplete="new-password"></label>
+        <label class="field" x-show="!uform.id">Password <small>optional — leave blank to send a sign-in link instead</small><input class="input" x-model="uform.password" autocomplete="new-password"></label>
         <label class="field" x-show="uform.id">Status<select class="select" x-model="uform.active"><option value="1">Active</option><option value="0">Disabled</option></select></label>
       </div>
       <div class="row"><button class="btn dark" type="submit">Save</button><button class="btn" type="button" @click="modal = null">Cancel</button></div>
     </form>
+    <div class="modal stack" x-show="modal === 'link'">
+      <h2 class="h2">Sign-in link for <span x-text="slink.name"></span></h2>
+      <p class="muted" style="margin:0">Send this to them. It signs them in once (until <b x-text="slink.until"></b>) and asks them to choose a password. Older links stop working.</p>
+      <div class="ok" x-show="slink.emailed" x-text="'Also emailed to ' + slink.email"></div>
+      <div class="secret linkbox"><span x-text="slink.url"></span><button class="btn sm" type="button" @click="AVN.copy(slink.url)">Copy</button></div>
+      <div class="row">
+        <a class="btn primary" :href="'https://wa.me/?text=' + encodeURIComponent(slink.msg || '')" target="_blank" rel="noopener">Send on WhatsApp</a>
+        <button class="btn" type="button" @click="AVN.copy(slink.msg)">Copy message</button>
+        <button class="btn" type="button" @click="modal = null">Done</button>
+      </div>
+    </div>
     <div class="modal" x-show="modal === 'secret'">
       <h2 class="h2">Temporary password</h2>
       <p class="muted" style="margin:0">Give this to <b x-text="secret.name"></b> (username <b x-text="secret.username"></b>). It is shown only now, and they will set their own password after signing in at <b x-text="location.origin + '/admin'"></b>.</p>

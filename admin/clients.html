@@ -44,7 +44,7 @@
           </div>
           <div class="row actions">
             <button class="btn sm" type="button" @click="openEdit(c)">Edit</button>
-            <button class="btn sm" type="button" @click="reset(c)">Reset password</button>
+            <button class="btn sm" type="button" @click="sendLink(c)" :disabled="!c.active" title="A one-time link that signs them in to choose a password">Portal link</button>
             <button class="btn sm" :class="c.active && 'danger'" type="button" @click="toggleActive(c)" x-text="c.active ? 'Disable' : 'Enable'"></button>
           </div>
         </div>
@@ -72,18 +72,29 @@
   <div class="overlay center" x-show="modal" x-transition.opacity @click.self="modal = null">
     <form class="modal" @submit.prevent="submit()" x-show="modal === 'form'">
       <h2 class="h2" x-text="form.id ? 'Edit client' : 'New client login'"></h2>
-      <p class="muted" style="margin:0" x-show="!form.id">The client signs in at <b x-text="portalUrl"></b> with their Customer ID or mobile number. They choose their own password on first sign-in.</p>
+      <p class="muted" style="margin:0" x-show="!form.id">You’ll get a one-tap link to send them on WhatsApp. They tap it, choose a password, and from then on sign in at <b x-text="portalUrl"></b> with their mobile number.</p>
       <div class="error" x-show="error" x-text="error"></div>
       <div class="grid" style="--min:200px">
         <label class="field">Client name<input class="input" x-model="form.name" required></label>
         <label class="field">Mobile number<input class="input" x-model="form.phone" inputmode="tel" placeholder="98765 43210" required></label>
         <label class="field">Email <small>optional</small><input class="input" type="email" x-model="form.email"></label>
         <label class="field" x-show="projects.length">Link to project<select class="select" x-model="form.projectId"><option value="">—</option><template x-for="p in projects" :key="p.id"><option :value="p.id" x-text="p.name"></option></template></select></label>
-        <label class="field" x-show="!form.id">Password <small>leave blank to generate one</small><input class="input" x-model="form.password" autocomplete="new-password" minlength="8"></label>
+        <label class="field" x-show="!form.id">Password <small>optional — leave blank to send a link instead</small><input class="input" x-model="form.password" autocomplete="new-password"></label>
       </div>
       <div class="row"><button class="btn dark" type="submit" x-text="form.id ? 'Save' : 'Create login'"></button><button class="btn" type="button" @click="modal = null">Cancel</button></div>
     </form>
 
+    <div class="modal stack" x-show="modal === 'link'">
+      <h2 class="h2">Portal link for <span x-text="clink.name"></span></h2>
+      <p class="muted" style="margin:0">Send it on WhatsApp. They tap it once (until <b x-text="clink.until"></b>), choose a password, and they’re in. Older links stop working.</p>
+      <div class="ok" x-show="clink.emailed" x-text="'Also emailed to ' + clink.email"></div>
+      <div class="secret linkbox"><span x-text="clink.url"></span><button class="btn sm" type="button" @click="AVN.copy(clink.url)">Copy</button></div>
+      <div class="row">
+        <a class="btn primary" :href="'https://wa.me/91' + clink.phone + '?text=' + encodeURIComponent(clink.msg || '')" target="_blank" rel="noopener">Send on WhatsApp</a>
+        <button class="btn" type="button" @click="AVN.copy(clink.msg)">Copy message</button>
+        <button class="btn" type="button" @click="modal = null">Done</button>
+      </div>
+    </div>
     <div class="modal" x-show="modal === 'creds'">
       <h2 class="h2">Login details</h2>
       <p class="muted" style="margin:0">Share these with <b x-text="creds.name"></b>. The password is shown only now.</p>

@@ -22,14 +22,17 @@
     <div><h1 class="title">My account</h1><div class="sub" x-text="$store.app.user.name + ' · ' + ($store.app.user.role === 'admin' ? 'Admin' : 'Staff') + ' · @' + $store.app.user.username"></div></div>
   </div>
   <div class="card stack" style="max-width:520px">
-    <template x-if="$store.app.user.mustChange">
-      <div class="ok" style="background:var(--amber-bg);color:var(--amber-fg)">You are signed in with a temporary password. Type that temporary password below, then choose your own. Lost it? Ask another admin to reset it, or run the reset command on the server.</div>
+    <template x-if="$store.app.user.mustChange && !$store.app.user.needsCurrent">
+      <div class="ok">Welcome! Choose your password and you’re in. You’ll use it with <b x-text="$store.app.user.email || $store.app.user.username"></b> next time.</div>
     </template>
-    <h2 class="h2">Change password</h2>
+    <template x-if="$store.app.user.mustChange && $store.app.user.needsCurrent">
+      <div class="ok" style="background:var(--amber-bg);color:var(--amber-fg)">You are signed in with a temporary password. Type it below, then choose your own. Lost it? Sign out and tap “Forgot password?”, or ask an admin for a sign-in link.</div>
+    </template>
+    <h2 class="h2" x-text="$store.app.user.needsCurrent === false ? 'Choose your password' : 'Change password'">Change password</h2>
     <div class="error" x-show="error" x-text="error" role="alert"></div>
     <form class="stack" @submit.prevent="save" novalidate>
       <input type="text" autocomplete="username" :value="$store.app.user.email || $store.app.user.username" hidden aria-hidden="true">
-      <label class="field"><span x-text="$store.app.user.mustChange ? 'Temporary password (the one you signed in with)' : 'Current password'">Current password</span>
+      <label class="field" x-show="$store.app.user.needsCurrent !== false"><span x-text="$store.app.user.mustChange ? 'Temporary password (the one you signed in with)' : 'Current password'">Current password</span>
         <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="current" autocomplete="current-password" @input="error = ''"><button type="button" class="pweye" @click="show = !show" :aria-label="show ? 'Hide passwords' : 'Show passwords'" x-text="show ? 'Hide' : 'Show'"></button></span></label>
       <label class="field">New password <small>at least 8 characters</small>
         <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="next" autocomplete="new-password" @input="error = ''"></span></label>
@@ -38,9 +41,9 @@
       <ul class="pwrules" aria-live="polite">
         <li :class="next.length >= 8 && 'pass'" x-text="(next.length >= 8 ? '✓ ' : '• ') + 'At least 8 characters' + (next && next.length < 8 ? ' (' + next.length + ' so far)' : '')"></li>
         <li :class="repeat && next === repeat && 'pass'" x-text="(repeat && next === repeat ? '✓ ' : '• ') + 'Both new passwords match'"></li>
-        <li :class="next && next !== current && 'pass'" x-text="(next && next !== current ? '✓ ' : '• ') + 'Different from the current password'"></li>
+        <li x-show="$store.app.user.needsCurrent !== false" :class="next && next !== current && 'pass'" x-text="(next && next !== current ? '✓ ' : '• ') + 'Different from the current password'"></li>
       </ul>
-      <button class="btn dark" type="submit" :disabled="busy" x-text="busy ? 'Saving…' : 'Save new password'">Save new password</button>
+      <button class="btn dark" type="submit" :disabled="busy" x-text="busy ? 'Saving…' : ($store.app.user.needsCurrent === false ? 'Save and continue' : 'Save new password')">Save new password</button>
     </form>
   </div>
 </main>

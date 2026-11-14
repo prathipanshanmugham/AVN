@@ -120,11 +120,13 @@ function requireClient(req, res, next) {
 }
 
 /** Regenerate the session on sign-in to prevent fixation, keeping the other identity if present. */
-function signIn(req, patch) {
+/** New session id on every sign-in. opts.maxAge: "keep me signed in" (stored with the session, so it lasts). */
+function signIn(req, patch, opts) {
   return new Promise((resolve, reject) => {
     const keep = { userId: req.session.userId, clientId: req.session.clientId };
     req.session.regenerate((err) => {
       if (err) return reject(err);
+      if (opts && opts.maxAge) req.session.cookie.maxAge = opts.maxAge;
       Object.assign(req.session, keep, patch);
       req.session.csrf = crypto.randomBytes(24).toString('hex');
       req.session.save((e) => (e ? reject(e) : resolve()));

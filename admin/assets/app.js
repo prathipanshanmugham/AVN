@@ -165,7 +165,7 @@
       get menu() { return this._menu; },
       set menu(v) { this._menu = !!v; document.documentElement.classList.toggle('menu-open', !!v); },
     });
-    if (page === 'login') { readyResolve(null); return; }
+    if (page === 'login' || page === 'link') { readyResolve(null); return; } // signed-out pages
     api('GET', '/auth/me').then((me) => {
       csrf = me.csrf;
       const s = Alpine.store('app');

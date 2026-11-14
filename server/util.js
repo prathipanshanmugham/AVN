@@ -89,4 +89,11 @@ const h = (fn) => (req, res, next) => {
   }
 };
 
-module.exports = { generatePassword, hashPassword, checkPassword, str, optStr, num, int, date, time, bool, phone, email, url, line, EMAIL_RE, HttpError, bad, notFound, forbidden, h };
+/** https://avnsolar.in for links in messages (from the request, behind nginx). */
+function baseUrl(req) {
+  const host = String(req.get('host') || '');
+  return /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? req.protocol + '://' + host : '';
+}
+
+module.exports = {
+  baseUrl, generatePassword, hashPassword, checkPassword, str, optStr, num, int, date, time, bool, phone, email, url, line, EMAIL_RE, HttpError, bad, notFound, forbidden, h };

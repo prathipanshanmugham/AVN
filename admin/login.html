@@ -16,28 +16,63 @@
 </head>
 <body>
 <div class="auth">
-  <form class="modal" x-data="login" @submit.prevent="submit" x-cloak>
+  <div class="modal auth-card" x-data="login" x-cloak>
     <div class="row">
       <img src="/assets/logo.png" alt="AVN Solar logo" width="52" height="52" style="object-fit:contain">
       <div><b style="font-family:var(--display);font-size:18px">AVN Workspace</b><div class="small muted">Dashboard · CRM · Quotations · Projects · Website</div></div>
     </div>
-    <div>
-      <h1 class="title" style="font-size:24px">Staff sign-in</h1>
-      <p class="muted" style="margin:4px 0 0">For AVN team members only.</p>
+
+    <!-- Sign in -->
+    <form class="stack" x-show="view === 'signin'" @submit.prevent="submit" novalidate>
+      <div>
+        <h1 class="title" style="font-size:24px">Staff sign-in</h1>
+        <p class="muted" style="margin:4px 0 0">For AVN team members.</p>
+      </div>
+      <div class="ok" x-show="notice" x-text="notice" role="status"></div>
+      <div class="error" x-show="error" x-text="error" role="alert"></div>
+      <label class="field">Email or username
+        <input class="input" x-model="username" autocomplete="username" autocapitalize="off" spellcheck="false" inputmode="email" placeholder="you@avnsolar.in" @input="error = ''" x-ref="user">
+      </label>
+      <div class="field">
+        <span class="row between" style="width:100%;flex-wrap:nowrap"><label for="pw">Password</label><button type="button" class="linkbtn" @click="openForgot()">Forgot password?</button></span>
+        <span class="pwbox"><input id="pw" class="input" :type="show ? 'text' : 'password'" x-model="password" autocomplete="current-password" @input="error = ''" x-ref="pw"><button type="button" class="pweye" @click="show = !show" :aria-label="show ? 'Hide password' : 'Show password'" x-text="show ? 'Hide' : 'Show'"></button></span>
+      </div>
+      <label class="check"><input type="checkbox" x-model="remember"> Keep me signed in on this device</label>
+      <button class="btn dark big" type="submit" :disabled="busy" x-text="busy ? 'Signing in…' : 'Sign in'">Sign in</button>
+    </form>
+
+    <!-- Forgot password -->
+    <form class="stack" x-show="view === 'forgot'" @submit.prevent="sendLink" novalidate>
+      <div>
+        <h1 class="title" style="font-size:24px">Get a sign-in link</h1>
+        <p class="muted" style="margin:4px 0 0">Enter the email on your AVN Workspace account. We’ll email you a link that signs you in, then you choose a new password.</p>
+      </div>
+      <div class="error" x-show="error" x-text="error" role="alert"></div>
+      <label class="field">Your email
+        <input class="input" type="email" x-model="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@avnsolar.in" @input="error = ''" x-ref="email">
+      </label>
+      <button class="btn dark big" type="submit" :disabled="busy" x-text="busy ? 'Sending…' : 'Email me a sign-in link'">Email me a sign-in link</button>
+      <button type="button" class="linkbtn" style="align-self:center" @click="back()">← Back to sign-in</button>
+    </form>
+
+    <!-- Link sent -->
+    <div class="stack" x-show="view === 'sent'">
+      <template x-if="emailOn">
+        <div class="stack">
+          <h1 class="title" style="font-size:24px">Check your email</h1>
+          <p style="margin:0">If <b x-text="email"></b> belongs to an AVN Workspace account, a sign-in link is on its way. It works once, for 30 minutes.</p>
+          <p class="small muted" style="margin:0">Nothing after a few minutes? Check spam, or ask an admin to send you a link from Settings → Users.</p>
+        </div>
+      </template>
+      <template x-if="!emailOn">
+        <div class="stack">
+          <h1 class="title" style="font-size:24px">Ask an admin for a link</h1>
+          <p style="margin:0">Email isn’t set up for AVN Workspace yet. Ask an admin to open <b>Settings → Users</b> and tap <b>Sign-in link</b> next to your name — they can send it to you on WhatsApp.</p>
+        </div>
+      </template>
+      <button type="button" class="btn big" @click="back()">Back to sign-in</button>
     </div>
-    <div class="error" x-show="error" x-text="error" role="alert"></div>
-    <label class="field">Username or email
-      <input class="input" x-model="username" autocomplete="username" required autofocus>
-    </label>
-    <label class="field">Password
-      <span class="row" style="flex-wrap:nowrap;gap:0">
-        <input class="input" :type="show ? 'text' : 'password'" x-model="password" autocomplete="current-password" required style="border-radius:12px 0 0 12px">
-        <button type="button" class="btn" style="border-radius:0 12px 12px 0;border-left:0" @click="show = !show" :aria-label="show ? 'Hide password' : 'Show password'" x-text="show ? 'Hide' : 'Show'"></button>
-      </span>
-    </label>
-    <button class="btn dark" type="submit" :disabled="busy" style="min-height:52px;font-size:16px" x-text="busy ? 'Signing in…' : 'Sign in'"></button>
-    <p class="small muted" style="margin:0;text-align:center">Forgot your password? Ask an admin to reset it from Settings → Users.</p>
-  </form>
+  </div>
   <a href="/" style="color:#C9D0EC;font-weight:700;text-decoration:none;padding:12px 16px">← Back to website</a>
 </div>
 </body>

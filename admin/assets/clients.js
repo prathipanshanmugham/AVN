@@ -1,7 +1,7 @@
 document.addEventListener('alpine:init', () => {
   Alpine.data('clients', () => ({
     list: [], requests: [], projects: [], tab: 'logins', q: '',
-    modal: null, form: {}, error: '', creds: {},
+    modal: null, form: {}, error: '', creds: {}, clink: {},
     portalUrl: location.origin + '/portal',
 
     async init() {
@@ -39,12 +39,25 @@ document.addEventListener('alpine:init', () => {
           this.modal = null;
           AVN.toast('Client saved');
         } else {
-          const r = await AVN.post('/clients', Object.assign({}, this.form, { projectId: this.form.projectId || null }));
-          this.creds = { name: r.client.name, customerId: r.client.customerId, phone: r.client.phone, password: r.tempPassword };
-          this.modal = 'creds';
+          const r = await AVN.post('/clients', Object.assign({}, this.form, { projectId: this.form.projectId || null, sendEmail: true }));
+          if (r.link) this.showLink(r.client, r.link);
+          else { this.creds = { name: r.client.name, customerId: r.client.customerId, phone: r.client.phone, password: r.tempPassword }; this.modal = 'creds'; }
         }
         await this.load();
       } catch (e) { this.error = e.message; }
+    },
+    /** One-time portal link, ready to send on WhatsApp (and emailed too when possible). */
+    async sendLink(c) {
+      try { this.showLink(c, await AVN.post('/clients/' + c.id + '/link', { sendEmail: true })); await this.load(); } catch (e) { AVN.toast(e.message, true); }
+    },
+    showLink(c, link) {
+      const until = new Date(link.expiresAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+      const first = String(c.name).split(' ')[0];
+      const msg = link.purpose === 'welcome'
+        ? 'Hello ' + first + ', your AVN Solar customer portal is ready — track your installation, download documents and raise service requests.\n\nTap to sign in and choose your password (works once, until ' + until + '):\n' + link.url + '\n\nAfter that, sign in any time at ' + this.portalUrl + ' with your mobile number.'
+        : 'Hello ' + first + ', here is your link to sign in to the AVN Solar customer portal and set a new password (works once, until ' + until + '):\n' + link.url;
+      this.clink = { name: c.name, phone: c.phone, email: c.email, url: link.url, until, emailed: link.emailed, msg };
+      this.modal = 'link';
     },
     async reset(c) {
       if (!confirm('Create a new temporary password for ' + c.name + '? Their old password stops working.')) return;

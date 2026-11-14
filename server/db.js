@@ -442,6 +442,21 @@ const MIGRATIONS = [
       require('./blog-starter').forEach((p) => add.run(p.slug, p.title, p.excerpt, p.body, p.tags));
     }
   },
+  // 6: one-time sign-in links (welcome, reset by staff, "forgot password"). Only a hash of the token is stored.
+  () => {
+    db.exec(`CREATE TABLE IF NOT EXISTS login_links (
+      id INTEGER PRIMARY KEY,
+      token_hash TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL CHECK (kind IN ('staff', 'client')),
+      subject_id INTEGER NOT NULL,
+      purpose TEXT NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER,
+      created_by INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    db.exec('CREATE INDEX IF NOT EXISTS idx_login_links_subject ON login_links(kind, subject_id)');
+  },
 ];
 
 /** "5 kWp", "120kW", "3.3" → number of kW. Pump ratings in HP are left for staff to fill in. */

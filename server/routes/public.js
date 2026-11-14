@@ -2,8 +2,12 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { db, getSettings, STAGES_PROJECT } = require('../db');
 const { csrfGuard, ensureCsrf, allowMustChange, requireClient, signIn } = require('../auth');
-const { h, str, num, line, email, bad, HttpError, phone, checkPassword, hashPassword } = require('../util');
-const { notifyLead } = require('../mailer');
+const { h, str, num, line, email, bool, bad, HttpError, phone, checkPassword, hashPassword, EMAIL_RE } = require('../util');
+const { notifyLead, sendLink, configured: mailReady } = require('../mailer');
+const links = require('../links');
+
+const KEEP_SIGNED_IN = 30 * 86400000;
+const freshStart = (req, c) => !!c.must_change && (req.session.viaLink || (req.session.pwAt && Date.now() - req.session.pwAt < 30 * 60000));
 
 const router = express.Router();
 
@@ -51,10 +55,7 @@ function leadSource(utm) {
   return 'Website';
 }
 
-function baseUrl(req) {
-  const host = String(req.get('host') || '');
-  return /^[a-z0-9.-]+(:\d+)?$/i.test(host) ? req.protocol + '://' + host : '';
-}
+const { baseUrl } = require('../util');
 
 router.post('/public/leads', leadLimiter, (req, res) => {
   if (str(req.body.website)) return res.status(201).json({ ok: true }); // honeypot
@@ -114,14 +115,51 @@ const portalLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardH
 const portal = express.Router();
 portal.use(csrfGuard);
 
-portal.post('/login', portalLimiter, h(async (req, res) => {
-  const login = str(req.body.login, 40);
+const findClient = (login) => {
   const ph = phone(login);
-  const c = ph ? db.prepare('SELECT * FROM clients WHERE phone = ?').get(ph) : db.prepare('SELECT * FROM clients WHERE customer_id = ?').get(login);
-  if (!c || !c.active || !checkPassword(req.body.password, c.password_hash)) throw new HttpError(401, 'Wrong Customer ID / mobile or password');
-  await signIn(req, { clientId: c.id });
+  return ph ? db.prepare('SELECT * FROM clients WHERE phone = ?').get(ph)
+    : db.prepare('SELECT * FROM clients WHERE customer_id = ? COLLATE NOCASE OR (email IS NOT NULL AND email = ? COLLATE NOCASE)').get(login, login);
+};
+
+portal.post('/login', portalLimiter, h(async (req, res) => {
+  const c = findClient(str(req.body.login, 120).trim());
+  if (!c || !checkPassword(String(req.body.password || ''), c.password_hash)) {
+    throw new HttpError(401, 'That mobile number / Customer ID and password don’t match. Tap “Forgot password?” for a sign-in link.');
+  }
+  if (!c.active) throw new HttpError(403, 'Your login is switched off. Please call or WhatsApp us.');
+  await signIn(req, { clientId: c.id, pwAt: Date.now() }, { maxAge: bool(req.body.remember) ? KEEP_SIGNED_IN : 0 });
   db.prepare("UPDATE clients SET last_login = datetime('now') WHERE id = ?").run(c.id);
   res.json({ mustChange: !!c.must_change, csrf: req.session.csrf });
+}));
+
+// "Forgot password?" — emails a 30-minute link if the account has an email; otherwise the page offers WhatsApp.
+const forgotLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Wait 15 minutes, or WhatsApp us.' } });
+portal.post('/forgot', forgotLimiter, (req, res) => {
+  const s = getSettings();
+  const ready = mailReady(s);
+  const c = findClient(str(req.body.login, 120).trim());
+  if (ready && c && c.active && c.email && EMAIL_RE.test(c.email)) {
+    const l = links.create('client', c.id, 'forgot');
+    const url = baseUrl(req) + l.path;
+    setImmediate(() => sendLink({ to: c.email, name: c.name, url, kind: 'client', purpose: 'forgot', expiresAt: l.expiresAt }).catch(() => {}));
+  }
+  res.json({ ok: true, email: ready, whatsapp: String(s.whatsapp || s.phone || '').replace(/\D/g, '').slice(-10) });
+});
+
+const linkLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many tries. Wait 15 minutes.' } });
+portal.get('/link/:token', linkLimiter, (req, res) => {
+  const p = links.peek('client', req.params.token);
+  const c = p.row && db.prepare('SELECT name, active FROM clients WHERE id = ?').get(p.row.subject_id);
+  if (p.error || !c || !c.active) return res.status(410).json({ error: links.MESSAGES[p.error] || 'Your login is switched off. Please call or WhatsApp us.' });
+  res.json({ name: c.name, purpose: p.row.purpose });
+});
+portal.post('/link', linkLimiter, h(async (req, res) => {
+  const p = links.consume('client', req.body.token);
+  const c = p.row && db.prepare('SELECT * FROM clients WHERE id = ?').get(p.row.subject_id);
+  if (p.error || !c || !c.active) throw new HttpError(410, links.MESSAGES[p.error] || 'Your login is switched off. Please call or WhatsApp us.');
+  db.prepare("UPDATE clients SET must_change = 1, last_login = datetime('now') WHERE id = ?").run(c.id);
+  await signIn(req, { clientId: c.id, viaLink: true }, { maxAge: bool(req.body.remember) ? KEEP_SIGNED_IN : 0 });
+  res.json({ ok: true, csrf: req.session.csrf });
 }));
 
 portal.post('/logout', (req, res) => {
@@ -131,11 +169,14 @@ portal.post('/logout', (req, res) => {
 
 portal.post('/password', allowMustChange, requireClient, (req, res) => {
   const full = db.prepare('SELECT password_hash FROM clients WHERE id = ?').get(req.client.id);
-  if (!checkPassword(req.body.current, full.password_hash)) throw bad('Your current password is not right');
+  if (!freshStart(req, req.client) && !checkPassword(String(req.body.current || ''), full.password_hash)) throw bad('Your current password is not right');
   const next = String(req.body.next || '');
   if (next.length < 8) throw bad('The new password needs at least 8 characters');
-  if (next === String(req.body.current)) throw bad('Choose a password different from the current one');
+  if (next.length > 200) throw bad('The new password is too long');
+  if (checkPassword(next, full.password_hash)) throw bad('Choose a password different from the current one');
   db.prepare('UPDATE clients SET password_hash = ?, must_change = 0 WHERE id = ?').run(hashPassword(next), req.client.id);
+  delete req.session.viaLink;
+  delete req.session.pwAt;
   res.json({ ok: true });
 });
 
@@ -151,7 +192,7 @@ portal.get('/me', allowMustChange, requireClient, (req, res) => {
     FROM service_requests r LEFT JOIN projects p ON p.id = r.project_id WHERE r.client_id = ? ORDER BY r.id DESC LIMIT 20`).all(c.id);
   const s = getSettings();
   res.json({
-    client: { name: c.name, customerId: c.customer_id, phone: c.phone, mustChange: !!c.must_change },
+    client: { name: c.name, customerId: c.customer_id, phone: c.phone, mustChange: !!c.must_change, needsCurrent: !freshStart(req, c) },
     stages: STAGES_PROJECT, projects, requests,
     contact: { phone: s.phone, whatsapp: s.whatsapp || s.phone, email: s.email },
     csrf: ensureCsrf(req),

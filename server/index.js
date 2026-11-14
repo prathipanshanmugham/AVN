@@ -231,6 +231,9 @@ app.get('/admin/login', sessionMiddleware, (req, res) => {
   if (u) return res.redirect(firstAllowedPage(u));
   sendPage(res, path.join(ADMIN, 'login.html'));
 });
+// One-time sign-in links open a page with a Continue button, so WhatsApp / email previews can't use them up.
+app.get('/admin/link/:token', (req, res) => { res.set('Cache-Control', 'no-store'); sendPage(res, path.join(ADMIN, 'link.html')); });
+app.get('/portal/link/:token', (req, res) => { res.set('Cache-Control', 'no-store'); sendPage(res, path.join(PORTAL, 'link.html')); });
 app.get(['/admin', '/admin/'], sessionMiddleware, (req, res) => {
   const u = currentUser(req);
   res.redirect(u ? firstAllowedPage(u) : '/admin/login');
