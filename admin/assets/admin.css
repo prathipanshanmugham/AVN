@@ -423,9 +423,5 @@ body{-webkit-tap-highlight-color:rgba(17,24,71,.08)}
 .auth-card{display:flex;flex-direction:column;gap:18px}
 .linkbtn{padding:6px 0;border:0;background:none;color:var(--blue);font:inherit;font-size:14px;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
 .linkbtn:hover{color:var(--ink)}
-.check{display:flex;align-items:center;gap:10px;min-height:44px;font-weight:600;cursor:pointer}
-.check input{width:20px;height:20px;accent-color:var(--ink);flex:none}
 .btn.big{min-height:52px;font-size:16px}
-.secret.linkbox{align-items:center}
-.secret.linkbox span{min-width:0;word-break:break-all;font-size:14px}
-.secret.linkbox .btn{flex:none}
+.hint{padding:12px 14px;border-radius:12px;background:var(--ground);border:1px solid var(--line);font-size:14px;line-height:1.5}

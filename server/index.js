@@ -6,7 +6,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const config = require('./config');
 const { db, MODULES } = require('./db');
-const { sessionMiddleware, currentUser, currentClient, can } = require('./auth');
+const { sessionMiddleware, currentUser, currentClient, can, signInEnded } = require('./auth');
 const { HttpError } = require('./util');
 const { DOCS_DIR } = require('./uploads');
 
@@ -231,18 +231,18 @@ app.get('/admin/login', sessionMiddleware, (req, res) => {
   if (u) return res.redirect(firstAllowedPage(u));
   sendPage(res, path.join(ADMIN, 'login.html'));
 });
-// One-time sign-in links open a page with a Continue button, so WhatsApp / email previews can't use them up.
-app.get('/admin/link/:token', (req, res) => { res.set('Cache-Control', 'no-store'); sendPage(res, path.join(ADMIN, 'link.html')); });
-app.get('/portal/link/:token', (req, res) => { res.set('Cache-Control', 'no-store'); sendPage(res, path.join(PORTAL, 'link.html')); });
+// After 24 hours the sign-in page says why ("?m=expired").
+const staffLogin = (req) => '/admin/login' + (signInEnded(req, 'user') ? '?m=expired' : '');
+const portalLogin = (req) => '/portal/login' + (signInEnded(req, 'client') ? '?m=expired' : '');
 app.get(['/admin', '/admin/'], sessionMiddleware, (req, res) => {
   const u = currentUser(req);
-  res.redirect(u ? firstAllowedPage(u) : '/admin/login');
+  res.redirect(u ? firstAllowedPage(u) : staffLogin(req));
 });
 app.get('/admin/:page', sessionMiddleware, (req, res, next) => {
   const page = req.params.page;
   if (!(page in ADMIN_PAGES)) return next();
   const u = currentUser(req);
-  if (!u) return res.redirect('/admin/login');
+  if (!u) return res.redirect(staffLogin(req));
   if (u.must_change && page !== 'account') return res.redirect('/admin/account');
   const mod = ADMIN_PAGES[page];
   if (mod && !can(u, mod)) return res.redirect(firstAllowedPage(u));
@@ -256,7 +256,7 @@ app.get('/portal/login', sessionMiddleware, (req, res) => {
   sendPage(res, path.join(PORTAL, 'login.html'));
 });
 app.get(['/portal', '/portal/'], sessionMiddleware, (req, res) => {
-  if (!currentClient(req)) return res.redirect('/portal/login');
+  if (!currentClient(req)) return res.redirect(portalLogin(req));
   res.set('Cache-Control', 'no-store');
   sendPage(res, path.join(PORTAL, 'index.html'));
 });
@@ -269,7 +269,7 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
   let message = err.message || 'Something went wrong';
   if (err.code === 'LIMIT_FILE_SIZE') { status = 400; message = 'That file is too large'; }
   if (status >= 500) { console.error(err); message = 'Something went wrong. Please try again.'; }
-  if (req.path.startsWith('/api')) return res.status(status).json({ error: message });
+  if (req.path.startsWith('/api')) return res.status(status).json(err.expired ? { error: message, expired: true } : { error: message });
   res.status(status).type('text').send(message);
 });
 

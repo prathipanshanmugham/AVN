@@ -23,15 +23,15 @@
   </div>
   <div class="card stack" style="max-width:520px">
     <template x-if="$store.app.user.mustChange && !$store.app.user.needsCurrent">
-      <div class="ok">Welcome! Choose your password and you’re in. You’ll use it with <b x-text="$store.app.user.email || $store.app.user.username"></b> next time.</div>
+      <div class="ok">Welcome! Choose your password and you’re in. Next time, sign in with username <b x-text="$store.app.user.username"></b> and this password.</div>
     </template>
     <template x-if="$store.app.user.mustChange && $store.app.user.needsCurrent">
-      <div class="ok" style="background:var(--amber-bg);color:var(--amber-fg)">You are signed in with a temporary password. Type it below, then choose your own. Lost it? Sign out and tap “Forgot password?”, or ask an admin for a sign-in link.</div>
+      <div class="ok" style="background:var(--amber-bg);color:var(--amber-fg)">You are signed in with a temporary password. Type it below, then choose your own. Lost it? Ask an admin to reset it again.</div>
     </template>
     <h2 class="h2" x-text="$store.app.user.needsCurrent === false ? 'Choose your password' : 'Change password'">Change password</h2>
     <div class="error" x-show="error" x-text="error" role="alert"></div>
     <form class="stack" @submit.prevent="save" novalidate>
-      <input type="text" autocomplete="username" :value="$store.app.user.email || $store.app.user.username" hidden aria-hidden="true">
+      <input type="text" autocomplete="username" :value="$store.app.user.username" hidden aria-hidden="true">
       <label class="field" x-show="$store.app.user.needsCurrent !== false"><span x-text="$store.app.user.mustChange ? 'Temporary password (the one you signed in with)' : 'Current password'">Current password</span>
         <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="current" autocomplete="current-password" @input="error = ''"><button type="button" class="pweye" @click="show = !show" :aria-label="show ? 'Hide passwords' : 'Show passwords'" x-text="show ? 'Hide' : 'Show'"></button></span></label>
       <label class="field">New password <small>at least 8 characters</small>

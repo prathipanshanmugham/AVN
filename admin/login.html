@@ -22,56 +22,27 @@
       <div><b style="font-family:var(--display);font-size:18px">AVN Workspace</b><div class="small muted">Dashboard · CRM · Quotations · Projects · Website</div></div>
     </div>
 
-    <!-- Sign in -->
-    <form class="stack" x-show="view === 'signin'" @submit.prevent="submit" novalidate>
+    <form class="stack" @submit.prevent="submit" novalidate>
       <div>
-        <h1 class="title" style="font-size:24px">Staff sign-in</h1>
-        <p class="muted" style="margin:4px 0 0">For AVN team members.</p>
+        <h1 class="title" style="font-size:24px" x-text="known ? 'Welcome back, ' + first : 'Staff sign-in'">Staff sign-in</h1>
+        <p class="muted" style="margin:4px 0 0" x-show="!known">For AVN team members.</p>
+        <p class="muted" style="margin:4px 0 0" x-show="known">Signing in as <b x-text="'@' + username"></b> · <button type="button" class="linkbtn" @click="forget()">Not you?</button></p>
       </div>
       <div class="ok" x-show="notice" x-text="notice" role="status"></div>
       <div class="error" x-show="error" x-text="error" role="alert"></div>
-      <label class="field">Email or username
-        <input class="input" x-model="username" autocomplete="username" autocapitalize="off" spellcheck="false" inputmode="email" placeholder="you@avnsolar.in" @input="error = ''" x-ref="user">
+      <label class="field" x-show="!known">Username or email
+        <input class="input" x-model="username" autocomplete="username" autocapitalize="off" spellcheck="false" placeholder="e.g. admin" @input="error = ''" x-ref="user">
       </label>
       <div class="field">
-        <span class="row between" style="width:100%;flex-wrap:nowrap"><label for="pw">Password</label><button type="button" class="linkbtn" @click="openForgot()">Forgot password?</button></span>
+        <span class="row between" style="width:100%;flex-wrap:nowrap"><label for="pw">Password</label><button type="button" class="linkbtn" @click="help = !help; error = ''">Forgot password?</button></span>
         <span class="pwbox"><input id="pw" class="input" :type="show ? 'text' : 'password'" x-model="password" autocomplete="current-password" @input="error = ''" x-ref="pw"><button type="button" class="pweye" @click="show = !show" :aria-label="show ? 'Hide password' : 'Show password'" x-text="show ? 'Hide' : 'Show'"></button></span>
       </div>
-      <label class="check"><input type="checkbox" x-model="remember"> Keep me signed in on this device</label>
-      <button class="btn dark big" type="submit" :disabled="busy" x-text="busy ? 'Signing in…' : 'Sign in'">Sign in</button>
-    </form>
-
-    <!-- Forgot password -->
-    <form class="stack" x-show="view === 'forgot'" @submit.prevent="sendLink" novalidate>
-      <div>
-        <h1 class="title" style="font-size:24px">Get a sign-in link</h1>
-        <p class="muted" style="margin:4px 0 0">Enter the email on your AVN Workspace account. We’ll email you a link that signs you in, then you choose a new password.</p>
+      <div class="hint" x-show="help" x-transition>
+        <b>Forgot your password?</b> Ask an admin to open <b>Settings → Users</b> and tap <b>Reset password</b> next to your name. You’ll get a new password to sign in with, then choose your own.
       </div>
-      <div class="error" x-show="error" x-text="error" role="alert"></div>
-      <label class="field">Your email
-        <input class="input" type="email" x-model="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@avnsolar.in" @input="error = ''" x-ref="email">
-      </label>
-      <button class="btn dark big" type="submit" :disabled="busy" x-text="busy ? 'Sending…' : 'Email me a sign-in link'">Email me a sign-in link</button>
-      <button type="button" class="linkbtn" style="align-self:center" @click="back()">← Back to sign-in</button>
+      <button class="btn dark big" type="submit" :disabled="busy" x-text="busy ? 'Signing in…' : 'Sign in'">Sign in</button>
+      <p class="small muted" style="margin:0;text-align:center">For safety, you stay signed in for 24 hours.</p>
     </form>
-
-    <!-- Link sent -->
-    <div class="stack" x-show="view === 'sent'">
-      <template x-if="emailOn">
-        <div class="stack">
-          <h1 class="title" style="font-size:24px">Check your email</h1>
-          <p style="margin:0">If <b x-text="email"></b> belongs to an AVN Workspace account, a sign-in link is on its way. It works once, for 30 minutes.</p>
-          <p class="small muted" style="margin:0">Nothing after a few minutes? Check spam, or ask an admin to send you a link from Settings → Users.</p>
-        </div>
-      </template>
-      <template x-if="!emailOn">
-        <div class="stack">
-          <h1 class="title" style="font-size:24px">Ask an admin for a link</h1>
-          <p style="margin:0">Email isn’t set up for AVN Workspace yet. Ask an admin to open <b>Settings → Users</b> and tap <b>Sign-in link</b> next to your name — they can send it to you on WhatsApp.</p>
-        </div>
-      </template>
-      <button type="button" class="btn big" @click="back()">Back to sign-in</button>
-    </div>
   </div>
   <a href="/" style="color:#C9D0EC;font-weight:700;text-decoration:none;padding:12px 16px">← Back to website</a>
 </div>

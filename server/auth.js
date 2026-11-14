@@ -4,6 +4,11 @@ const config = require('./config');
 const { db, getPermissions } = require('./db');
 const { HttpError } = require('./util');
 
+/** Every sign-in lasts 24 hours from the moment of signing in — activity does not extend it. */
+const SIGN_IN_MS = 24 * 60 * 60 * 1000;
+/** The cookie and stored session outlive the sign-in by a few days only so the sign-in page can say "24 hours are up". */
+const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
+
 /** express-session store backed by the app's SQLite database. */
 class SqliteStore extends session.Store {
   constructor() {
@@ -15,9 +20,11 @@ class SqliteStore extends session.Store {
     this.timer = setInterval(() => db.prepare('DELETE FROM sessions WHERE expires < ?').run(Date.now()), 60 * 60 * 1000);
     this.timer.unref();
   }
+  /** Stored until a few days after the latest sign-in (the 24-hour limit itself is checked in currentUser / currentClient). */
   expiry(sess) {
-    const ms = sess && sess.cookie && sess.cookie.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + 86400000;
-    return ms;
+    const at = Math.max((sess && sess.userAt) || 0, (sess && sess.clientAt) || 0);
+    if (at) return at + KEEP_MS;
+    return sess && sess.cookie && sess.cookie.expires ? new Date(sess.cookie.expires).getTime() : Date.now() + KEEP_MS;
   }
   get(sid, cb) {
     try {
@@ -43,12 +50,12 @@ const sessionMiddleware = session({
   store: new SqliteStore(),
   resave: false,
   saveUninitialized: false,
-  rolling: true,
+  rolling: false,
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
     secure: config.httpsOnly ? true : 'auto',
-    maxAge: 12 * 60 * 60 * 1000,
+    maxAge: KEEP_MS,
   },
 });
 
@@ -71,15 +78,29 @@ function csrfGuard(req, res, next) {
 const loadUser = db.prepare('SELECT id, name, username, email, role, active, must_change FROM users WHERE id = ?');
 const loadClient = db.prepare('SELECT id, customer_id, name, phone, email, active, must_change FROM clients WHERE id = ?');
 
+const fresh = (at) => !!at && Date.now() - at < SIGN_IN_MS;
+
 function currentUser(req) {
-  if (!req.session || !req.session.userId) return null;
+  if (!req.session || !req.session.userId || !fresh(req.session.userAt)) return null;
   const u = loadUser.get(req.session.userId);
   return u && u.active ? u : null;
 }
 function currentClient(req) {
-  if (!req.session || !req.session.clientId) return null;
+  if (!req.session || !req.session.clientId || !fresh(req.session.clientAt)) return null;
   const c = loadClient.get(req.session.clientId);
   return c && c.active ? c : null;
+}
+
+/** True when this browser was signed in (as staff 'user' or portal 'client') and the 24 hours are up. */
+function signInEnded(req, kind) {
+  const s = req.session;
+  return !!(s && s[kind + 'Id'] && !fresh(s[kind + 'At']));
+}
+/** 401 — with a clear "time's up" message when the 24 hours have passed. */
+function signedOut(ended) {
+  const e = new HttpError(401, ended ? 'For safety, sign-ins last 24 hours. Please sign in again.' : 'Please sign in');
+  if (ended) e.expired = true;
+  return e;
 }
 
 function can(user, module) {
@@ -91,7 +112,7 @@ function can(user, module) {
 /** Staff (admin or staff) must be signed in. Blocks everything but password change until a temp password is replaced. */
 function requireStaff(req, res, next) {
   const u = currentUser(req);
-  if (!u) return next(new HttpError(401, 'Please sign in'));
+  if (!u) return next(signedOut(signInEnded(req, 'user')));
   req.user = u;
   if (u.must_change && !req.allowMustChange) {
     return res.status(403).json({ error: 'Please set a new password first', mustChange: true });
@@ -111,7 +132,7 @@ const requirePerm = (module) => (req, res, next) => {
 
 function requireClient(req, res, next) {
   const c = currentClient(req);
-  if (!c) return next(new HttpError(401, 'Please sign in'));
+  if (!c) return next(signedOut(signInEnded(req, 'client')));
   req.client = c;
   if (c.must_change && !req.allowMustChange) {
     return res.status(403).json({ error: 'Please set a new password first', mustChange: true });
@@ -119,19 +140,33 @@ function requireClient(req, res, next) {
   next();
 }
 
-/** Regenerate the session on sign-in to prevent fixation, keeping the other identity if present. */
-/** New session id on every sign-in. opts.maxAge: "keep me signed in" (stored with the session, so it lasts). */
-function signIn(req, patch, opts) {
+/**
+ * New session id on every sign-in (prevents fixation), keeping the other identity if present.
+ * The sign-in time is stored per identity: staff and portal sign-ins each end 24 hours after they began.
+ */
+function signIn(req, patch) {
   return new Promise((resolve, reject) => {
-    const keep = { userId: req.session.userId, clientId: req.session.clientId };
+    const s = req.session;
+    const keep = { userId: s.userId, userAt: s.userAt, clientId: s.clientId, clientAt: s.clientAt };
+    const now = Date.now();
     req.session.regenerate((err) => {
       if (err) return reject(err);
-      if (opts && opts.maxAge) req.session.cookie.maxAge = opts.maxAge;
       Object.assign(req.session, keep, patch);
+      if (patch.userId) req.session.userAt = now;
+      if (patch.clientId) req.session.clientAt = now;
       req.session.csrf = crypto.randomBytes(24).toString('hex');
       req.session.save((e) => (e ? reject(e) : resolve()));
     });
   });
 }
 
-module.exports = { sessionMiddleware, ensureCsrf, csrfGuard, currentUser, currentClient, can, requireStaff, allowMustChange, requireAdmin, requirePerm, requireClient, signIn };
+/** Ends every stored sign-in of one person — field 'userId' or 'clientId' — except the session keepSid. */
+function signOutEverywhere(field, id, keepSid) {
+  try {
+    db.prepare('SELECT sid, data FROM sessions').all().forEach((r) => {
+      try { if (r.sid !== keepSid && JSON.parse(r.data)[field] === id) db.prepare('DELETE FROM sessions WHERE sid = ?').run(r.sid); } catch (e) { /* skip */ }
+    });
+  } catch (e) { /* ignore */ }
+}
+
+module.exports = { SIGN_IN_MS, signOutEverywhere, signInEnded, sessionMiddleware, ensureCsrf, csrfGuard, currentUser, currentClient, can, requireStaff, allowMustChange, requireAdmin, requirePerm, requireClient, signIn };

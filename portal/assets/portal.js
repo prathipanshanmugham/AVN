@@ -7,66 +7,54 @@
     const res = await fetch('/api/portal' + url, opts);
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
-    if (res.status === 401 && url !== '/login') { location.href = '/portal/login'; throw new Error('Please sign in'); }
+    if (res.status === 401 && url !== '/login') { location.href = '/portal/login' + (data && data.expired ? '?m=expired' : ''); throw new Error((data && data.error) || 'Please sign in'); }
     if (!res.ok) throw new Error((data && data.error) || 'Something went wrong');
     return data;
   }
 
   document.addEventListener('alpine:init', () => {
+    /* Customer sign-in. After the first sign-in on a device, only the password is asked. Each sign-in lasts 24 hours. */
+    const KEY = 'avn-portal-login';
+    function remembered() {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return null;
+        try { const v = JSON.parse(raw); if (v && v.l) return v; } catch (e) { /* plain text from older versions */ }
+        return { l: raw, n: '' };
+      } catch (e) { return null; }
+    }
     Alpine.data('portalLogin', () => ({
-      view: 'signin', login: '', password: '', show: false, remember: true, busy: false, error: '', notice: '', emailOn: false, wa: '',
+      login: '', name: '', known: false, password: '', show: false, busy: false, error: '', notice: '', help: false, wa: '',
+      get first() { return String(this.name).split(/\s+/)[0] || 'there'; },
       init() {
-        if (new URLSearchParams(location.search).get('m') === 'expired') this.notice = 'That sign-in link has expired or was already used. Sign in with your password, or ask for a new link.';
-        try { this.login = localStorage.getItem('avn-portal-login') || ''; } catch (e) { /* private mode */ }
+        if (new URLSearchParams(location.search).get('m') === 'expired') this.notice = 'For safety, sign-ins last 24 hours. Please sign in again.';
+        const r = remembered();
+        if (r) { this.login = r.l; this.name = r.n; this.known = !!r.n; }
         this.$nextTick(() => (this.login ? this.$refs.pw : this.$refs.login).focus());
       },
+      forget() {
+        try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+        this.known = false; this.login = ''; this.name = ''; this.password = ''; this.error = '';
+        this.$nextTick(() => this.$refs.login.focus());
+      },
       get waLink() {
-        return 'https://wa.me/91' + this.wa + '?text=' + encodeURIComponent('Hi AVN Solar, please send me a new sign-in link for the customer portal. My mobile / Customer ID: ' + this.login.trim());
+        return 'https://wa.me/91' + this.wa + '?text=' + encodeURIComponent('Hi AVN Solar, I forgot my customer portal password. Please send me a new one. My mobile / Customer ID: ' + this.login.trim());
+      },
+      async toggleHelp() {
+        this.error = '';
+        this.help = !this.help;
+        if (this.help && !this.wa) { try { this.wa = (await api('GET', '/help')).whatsapp || ''; } catch (e) { /* the text still helps */ } }
       },
       async submit() {
         this.error = '';
         if (!this.login.trim()) { this.error = 'Enter your mobile number or Customer ID'; return; }
-        if (!this.password) { this.error = 'Enter your password'; return; }
+        if (!this.password) { this.error = 'Enter your password'; this.$refs.pw.focus(); return; }
         this.busy = true;
         try {
-          await api('POST', '/login', { login: this.login.trim(), password: this.password, remember: this.remember });
-          try { localStorage.setItem('avn-portal-login', this.login.trim()); } catch (e) { /* ignore */ }
+          const r = await api('POST', '/login', { login: this.login.trim(), password: this.password });
+          try { localStorage.setItem(KEY, JSON.stringify({ l: this.login.trim(), n: r.name || '' })); } catch (e) { /* ignore */ }
           location.href = '/portal';
-        } catch (e) { this.error = e.message; this.busy = false; this.password = ''; }
-      },
-      openForgot() { this.error = ''; this.notice = ''; this.view = 'forgot'; this.$nextTick(() => this.$refs.flogin.focus()); },
-      back() { this.error = ''; this.view = 'signin'; },
-      async sendLink() {
-        this.error = '';
-        if (!this.login.trim()) { this.error = 'Enter your mobile number or Customer ID'; return; }
-        this.busy = true;
-        try {
-          const r = await api('POST', '/forgot', { login: this.login.trim() });
-          this.emailOn = !!r.email;
-          this.wa = r.whatsapp || '';
-          this.view = 'sent';
-        } catch (e) { this.error = e.message; } finally { this.busy = false; }
-      },
-    }));
-
-    Alpine.data('portalLink', () => ({
-      state: 'loading', name: '', purpose: '', error: '', busy: false, remember: true,
-      token: location.pathname.split('/').pop(),
-      get first() { return String(this.name).split(/\s+/)[0] || 'there'; },
-      async init() {
-        try {
-          const r = await fetch('/api/portal/link/' + encodeURIComponent(this.token), { credentials: 'same-origin' });
-          const data = await r.json().catch(() => ({}));
-          if (!r.ok) { this.error = data.error || 'This sign-in link is not valid.'; this.state = 'bad'; return; }
-          this.name = data.name;
-          this.purpose = data.purpose;
-          this.state = 'ready';
-        } catch (e) { this.error = 'Could not check the link. Check your connection and try again.'; this.state = 'bad'; }
-      },
-      async go() {
-        this.busy = true;
-        this.error = '';
-        try { await api('POST', '/link', { token: this.token, remember: this.remember }); location.replace('/portal'); } catch (e) { this.error = e.message; this.busy = false; }
+        } catch (e) { this.error = e.message; this.busy = false; this.password = ''; this.$nextTick(() => this.$refs.pw.focus()); }
       },
     }));
 

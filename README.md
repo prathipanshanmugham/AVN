@@ -31,10 +31,11 @@ Every website enquiry (quote wizard, offer popup, calculator, WhatsApp) lands in
 
 ## Signing in (staff and customers)
 
-- **New people get a sign-in link, not a password.** Settings → Users → Add user (or Clients → New client login) shows a one-time link with **Send on WhatsApp**, Copy, and — when the person has an email and email is set up — it is emailed too. They tap it, tap **Continue**, choose a password, and they are in.
-- **Forgot password?** on both sign-in pages: staff get a 30-minute link by email; customers get it by email if their account has one, plus a one-tap WhatsApp message to AVN. Admins can send a fresh link any time (Users → **Sign-in link**, Clients → **Portal link**); a new link cancels older ones, and each works once (welcome 7 days, others 2 days).
-- **Keep me signed in on this device** (on by default) keeps people signed in for 30 days; otherwise 12 hours.
-- Typing a password for someone still works (leave the field blank to use a link). First sign-in never asks for the temporary password again.
+- **Password only — nothing is emailed.** Staff sign in at `/admin/login` with their username (or email) and password; customers at `/portal/login` with their mobile number (or Customer ID) and password.
+- After the first sign-in on a device, the page remembers who you are and **asks only for the password** ("Not you?" switches account).
+- **Every sign-in lasts 24 hours**, from the moment of signing in — working in the app does not extend it. After that the sign-in page says the 24 hours are up.
+- New people: Settings → Users → Add user (or Clients → New client login) gives a first password with **Send on WhatsApp**. They sign in with it and choose their own (they are not asked to retype the first one).
+- **Forgot password?** Staff: an admin taps **Reset password** in Settings → Users. Customers: the page offers a WhatsApp message to AVN; staff tap **Reset password** in Clients. A reset signs that person out everywhere.
 - Server fallback for the admin: `sudo -u avn npm run admin:set -- admin@avnsolar.in` prints a new password.
 
 ## Search engines (SEO)
@@ -48,10 +49,10 @@ Every website enquiry (quote wizard, offer popup, calculator, WhatsApp) lands in
 ## Security
 
 - Passwords hashed with bcrypt; every new staff or client account gets a temporary password and must set its own on first sign-in.
-- Sessions stored server-side (SQLite), `HttpOnly` + `SameSite` cookies, `Secure` when `HTTPS_ONLY=1`.
+- Sessions stored server-side (SQLite), `HttpOnly` + `SameSite` cookies, `Secure` when `HTTPS_ONLY=1`; each sign-in ends 24 hours after it began.
 - CSRF token required on every change request; sign-in rate limiting; Helmet security headers and CSP.
 - Project documents are served only to staff with Projects access or to the client who owns the project.
-- No Google sign-in — username/email + password only.
+- No Google or email sign-in — password only.
 
 ## Run locally
 

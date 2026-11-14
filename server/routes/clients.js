@@ -1,20 +1,7 @@
 const express = require('express');
 const { db } = require('../db');
-const { requirePerm } = require('../auth');
-const crypto = require('crypto');
-const { getSettings } = require('../db');
-const { str, optStr, int, bool, bad, notFound, phone, generatePassword, hashPassword, baseUrl, EMAIL_RE } = require('../util');
-const links = require('../links');
-const { sendLink, configured: mailReady } = require('../mailer');
-
-/** A one-time portal sign-in link, shared on WhatsApp (and emailed if asked and possible). */
-function makeClientLink(req, c, purpose, email) {
-  const l = links.create('client', c.id, purpose, req.user.id);
-  const url = baseUrl(req) + l.path;
-  const willEmail = !!(email && c.email && mailReady(getSettings()));
-  if (willEmail) setImmediate(() => sendLink({ to: c.email, name: c.name, url, kind: 'client', purpose, expiresAt: l.expiresAt }).catch(() => {}));
-  return { url, expiresAt: l.expiresAt, purpose, emailed: willEmail };
-}
+const { requirePerm, signOutEverywhere } = require('../auth');
+const { str, optStr, int, bool, bad, notFound, phone, generatePassword, hashPassword, EMAIL_RE } = require('../util');
 
 const router = express.Router();
 router.use(['/clients', '/requests'], requirePerm('clients'));
@@ -50,26 +37,18 @@ router.post('/clients', (req, res) => {
   if (db.prepare('SELECT 1 FROM clients WHERE phone = ?').get(ph)) throw bad('A client with this mobile number already exists');
   if (projectId && !db.prepare('SELECT 1 FROM projects WHERE id = ?').get(projectId)) throw bad('Unknown project');
   if (email && !EMAIL_RE.test(email)) throw bad('Check the email address');
-  // With a password typed by staff: shared as before. Without: a one-tap sign-in link to send on WhatsApp.
+  // A first password (typed by staff, or made for them). Shown once; the client chooses their own after signing in.
   const provided = String(req.body.password || '');
   if (provided && provided.length < 8) throw bad('Password must be at least 8 characters');
-  const hashed = provided ? hashPassword(provided) : hashPassword(crypto.randomBytes(32).toString('hex'));
+  const temp = provided || generatePassword();
+  const hashed = hashPassword(temp);
   let id;
   db.transaction(() => {
     id = db.prepare('INSERT INTO clients (customer_id, name, phone, email, password_hash, must_change, created_by) VALUES (?,?,?,?,?,1,?)')
       .run(nextCustomerId(), name, ph, email, hashed, req.user.id).lastInsertRowid;
     if (projectId) db.prepare('UPDATE projects SET client_id = ? WHERE id = ?').run(id, projectId);
   })();
-  const c = db.prepare(SELECT + ' WHERE c.id = ?').get(id);
-  if (provided) return res.status(201).json({ client: clientOut(c), tempPassword: provided });
-  res.status(201).json({ client: clientOut(c), link: makeClientLink(req, c, 'welcome', bool(req.body.sendEmail)) });
-});
-
-router.post('/clients/:id/link', (req, res) => {
-  const c = db.prepare('SELECT * FROM clients WHERE id = ?').get(req.params.id);
-  if (!c) throw notFound();
-  if (!c.active) throw bad('Turn this client’s login on first');
-  res.json(makeClientLink(req, c, c.last_login ? 'reset' : 'welcome', bool(req.body.sendEmail)));
+  res.status(201).json({ client: clientOut(db.prepare(SELECT + ' WHERE c.id = ?').get(id)), tempPassword: temp });
 });
 
 router.patch('/clients/:id', (req, res) => {
@@ -101,6 +80,7 @@ router.post('/clients/:id/reset-password', (req, res) => {
   if (!c) throw notFound();
   const temp = generatePassword();
   db.prepare('UPDATE clients SET password_hash = ?, must_change = 1 WHERE id = ?').run(hashPassword(temp), c.id);
+  signOutEverywhere('clientId', c.id);
   res.json({ tempPassword: temp });
 });
 

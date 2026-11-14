@@ -99,7 +99,12 @@ document.addEventListener('alpine:init', () => {
       { id: 'blog', name: 'Blog', desc: 'Write, schedule and publish articles on the website' },
     ],
     sec: 'users', isAdmin: false, users: [], perms: {}, cfg: {}, comps: [],
-    modal: null, uform: {}, error: '', secret: {}, slink: {},
+    modal: null, uform: {}, error: '', secret: {},
+    get secretMessage() {
+      return 'Hi ' + String(this.secret.name || '').split(' ')[0] + ', here are your AVN Workspace sign-in details.\n' +
+        'Sign in: ' + location.origin + '/admin\nUsername: ' + this.secret.username + '\nPassword: ' + this.secret.password +
+        '\nYou will choose your own password after signing in.';
+    },
 
     async init() {
       await AVN.ready;
@@ -158,28 +163,15 @@ document.addEventListener('alpine:init', () => {
           this.modal = null;
           AVN.toast('User saved');
         } else {
-          const r = await AVN.post('/users', Object.assign({}, this.uform, { sendEmail: true }));
-          if (r.link) this.showLink(r.user, r.link);
-          else { this.secret = { name: r.user.name, username: r.user.username, password: r.tempPassword }; this.modal = 'secret'; }
+          const r = await AVN.post('/users', this.uform);
+          this.secret = { name: r.user.name, username: r.user.username, password: r.tempPassword };
+          this.modal = 'secret';
         }
         this.users = await AVN.get('/users');
       } catch (e) { this.error = e.message; }
     },
-    /** A one-time sign-in link: copy, WhatsApp, and (when the user has an email and email is set up) emailed too. */
-    async linkUser(u) {
-      try { this.showLink(u, await AVN.post('/users/' + u.id + '/link', { sendEmail: true })); this.users = await AVN.get('/users'); } catch (e) { AVN.toast(e.message, true); }
-    },
-    showLink(u, link) {
-      const until = new Date(link.expiresAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-      const login = u.email || u.username;
-      const msg = link.purpose === 'welcome'
-        ? 'Hi ' + u.name.split(' ')[0] + ', your AVN Workspace account is ready. Tap this link to sign in and choose your password (works once, until ' + until + '):\n' + link.url + '\n\nAfter that, sign in at ' + location.origin + '/admin with ' + login + '.'
-        : 'Hi ' + u.name.split(' ')[0] + ', here is your link to sign in to AVN Workspace and set a new password (works once, until ' + until + '):\n' + link.url;
-      this.slink = { name: u.name, email: u.email, url: link.url, until, emailed: link.emailed, msg };
-      this.modal = 'link';
-    },
     async resetUser(u) {
-      if (!confirm('Create a new temporary password for ' + u.name + '?')) return;
+      if (!confirm('Give ' + u.name + ' a new password? Their old one stops working and they are signed out.')) return;
       try {
         const r = await AVN.post('/users/' + u.id + '/reset-password');
         this.secret = { name: u.name, username: u.username, password: r.tempPassword };

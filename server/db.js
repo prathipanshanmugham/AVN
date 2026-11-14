@@ -457,6 +457,11 @@ const MIGRATIONS = [
     )`);
     db.exec('CREATE INDEX IF NOT EXISTS idx_login_links_subject ON login_links(kind, subject_id)');
   },
+  // 7: password-only sign-in, 24 hours per sign-in. Sign-in links are gone; everyone signs in once more under the new rule.
+  () => {
+    db.exec('DROP TABLE IF EXISTS login_links');
+    db.exec('DELETE FROM sessions');
+  },
 ];
 
 /** "5 kWp", "120kW", "3.3" → number of kW. Pump ratings in HP are left for staff to fill in. */

@@ -1,13 +1,12 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { db, getSettings, STAGES_PROJECT } = require('../db');
-const { csrfGuard, ensureCsrf, allowMustChange, requireClient, signIn } = require('../auth');
-const { h, str, num, line, email, bool, bad, HttpError, phone, checkPassword, hashPassword, EMAIL_RE } = require('../util');
-const { notifyLead, sendLink, configured: mailReady } = require('../mailer');
-const links = require('../links');
+const { csrfGuard, ensureCsrf, allowMustChange, requireClient, signIn, signOutEverywhere } = require('../auth');
+const { h, str, num, line, email, bad, HttpError, phone, checkPassword, hashPassword } = require('../util');
+const { notifyLead } = require('../mailer');
 
-const KEEP_SIGNED_IN = 30 * 86400000;
-const freshStart = (req, c) => !!c.must_change && (req.session.viaLink || (req.session.pwAt && Date.now() - req.session.pwAt < 30 * 60000));
+/** Right after signing in with a temporary password, the new one can be set without typing the temporary one again. */
+const freshStart = (req, c) => !!c.must_change && !!req.session.pwAt && Date.now() - req.session.pwAt < 30 * 60000;
 
 const router = express.Router();
 
@@ -124,43 +123,19 @@ const findClient = (login) => {
 portal.post('/login', portalLimiter, h(async (req, res) => {
   const c = findClient(str(req.body.login, 120).trim());
   if (!c || !checkPassword(String(req.body.password || ''), c.password_hash)) {
-    throw new HttpError(401, 'That mobile number / Customer ID and password don’t match. Tap “Forgot password?” for a sign-in link.');
+    throw new HttpError(401, 'That mobile number / Customer ID and password don’t match. Check for typos — or WhatsApp us for a new password.');
   }
   if (!c.active) throw new HttpError(403, 'Your login is switched off. Please call or WhatsApp us.');
-  await signIn(req, { clientId: c.id, pwAt: Date.now() }, { maxAge: bool(req.body.remember) ? KEEP_SIGNED_IN : 0 });
+  await signIn(req, { clientId: c.id, pwAt: Date.now() });
   db.prepare("UPDATE clients SET last_login = datetime('now') WHERE id = ?").run(c.id);
-  res.json({ mustChange: !!c.must_change, csrf: req.session.csrf });
+  res.json({ mustChange: !!c.must_change, name: c.name, csrf: req.session.csrf });
 }));
 
-// "Forgot password?" — emails a 30-minute link if the account has an email; otherwise the page offers WhatsApp.
-const forgotLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Wait 15 minutes, or WhatsApp us.' } });
-portal.post('/forgot', forgotLimiter, (req, res) => {
+// For "Forgot password?": who to contact (AVN staff reset the password from Clients).
+portal.get('/help', (req, res) => {
   const s = getSettings();
-  const ready = mailReady(s);
-  const c = findClient(str(req.body.login, 120).trim());
-  if (ready && c && c.active && c.email && EMAIL_RE.test(c.email)) {
-    const l = links.create('client', c.id, 'forgot');
-    const url = baseUrl(req) + l.path;
-    setImmediate(() => sendLink({ to: c.email, name: c.name, url, kind: 'client', purpose: 'forgot', expiresAt: l.expiresAt }).catch(() => {}));
-  }
-  res.json({ ok: true, email: ready, whatsapp: String(s.whatsapp || s.phone || '').replace(/\D/g, '').slice(-10) });
+  res.json({ whatsapp: String(s.whatsapp || s.phone || '').replace(/\D/g, '').slice(-10), phone: s.phone || '' });
 });
-
-const linkLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many tries. Wait 15 minutes.' } });
-portal.get('/link/:token', linkLimiter, (req, res) => {
-  const p = links.peek('client', req.params.token);
-  const c = p.row && db.prepare('SELECT name, active FROM clients WHERE id = ?').get(p.row.subject_id);
-  if (p.error || !c || !c.active) return res.status(410).json({ error: links.MESSAGES[p.error] || 'Your login is switched off. Please call or WhatsApp us.' });
-  res.json({ name: c.name, purpose: p.row.purpose });
-});
-portal.post('/link', linkLimiter, h(async (req, res) => {
-  const p = links.consume('client', req.body.token);
-  const c = p.row && db.prepare('SELECT * FROM clients WHERE id = ?').get(p.row.subject_id);
-  if (p.error || !c || !c.active) throw new HttpError(410, links.MESSAGES[p.error] || 'Your login is switched off. Please call or WhatsApp us.');
-  db.prepare("UPDATE clients SET must_change = 1, last_login = datetime('now') WHERE id = ?").run(c.id);
-  await signIn(req, { clientId: c.id, viaLink: true }, { maxAge: bool(req.body.remember) ? KEEP_SIGNED_IN : 0 });
-  res.json({ ok: true, csrf: req.session.csrf });
-}));
 
 portal.post('/logout', (req, res) => {
   delete req.session.clientId;
@@ -169,13 +144,13 @@ portal.post('/logout', (req, res) => {
 
 portal.post('/password', allowMustChange, requireClient, (req, res) => {
   const full = db.prepare('SELECT password_hash FROM clients WHERE id = ?').get(req.client.id);
-  if (!freshStart(req, req.client) && !checkPassword(String(req.body.current || ''), full.password_hash)) throw bad('Your current password is not right');
+  if (!freshStart(req, req.client) && !checkPassword(String(req.body.current || ''), full.password_hash)) throw bad('Your current password is not right. Forgot it? WhatsApp us for a new one.');
   const next = String(req.body.next || '');
   if (next.length < 8) throw bad('The new password needs at least 8 characters');
   if (next.length > 200) throw bad('The new password is too long');
   if (checkPassword(next, full.password_hash)) throw bad('Choose a password different from the current one');
   db.prepare('UPDATE clients SET password_hash = ?, must_change = 0 WHERE id = ?').run(hashPassword(next), req.client.id);
-  delete req.session.viaLink;
+  signOutEverywhere('clientId', req.client.id, req.sessionID);
   delete req.session.pwAt;
   res.json({ ok: true });
 });

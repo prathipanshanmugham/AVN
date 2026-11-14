@@ -93,7 +93,7 @@
     const res = await fetch('/api' + url, opts);
     let data = null;
     try { data = await res.json(); } catch (e) { data = null; }
-    if (res.status === 401 && !url.startsWith('/auth/login')) { location.href = '/admin/login'; throw new Error('Please sign in'); }
+    if (res.status === 401 && !url.startsWith('/auth/login')) { location.href = '/admin/login' + (data && data.expired ? '?m=expired' : ''); throw new Error((data && data.error) || 'Please sign in'); }
     if (res.status === 403 && data && data.mustChange && page !== 'account') { location.href = '/admin/account'; throw new Error(data.error); }
     if (!res.ok) throw new Error((data && data.error) || 'Something went wrong');
     return data;
@@ -165,7 +165,7 @@
       get menu() { return this._menu; },
       set menu(v) { this._menu = !!v; document.documentElement.classList.toggle('menu-open', !!v); },
     });
-    if (page === 'login' || page === 'link') { readyResolve(null); return; } // signed-out pages
+    if (page === 'login') { readyResolve(null); return; } // signed-out page
     api('GET', '/auth/me').then((me) => {
       csrf = me.csrf;
       const s = Alpine.store('app');

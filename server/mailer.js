@@ -99,36 +99,4 @@ async function sendTest(to) {
   return list;
 }
 
-/**
- * A one-time sign-in link (staff workspace or customer portal). Returns { sent } or { error }; never throws.
- * opts: { to, name, url, kind: 'staff'|'client', purpose: 'welcome'|'reset'|'forgot', expiresAt }
- */
-async function sendLink(opts) {
-  const s = getSettings();
-  if (!configured(s) || !EMAIL_RE.test(String(opts.to || ''))) return { skipped: true };
-  const brand = s.brand_name || 'AVN Solar';
-  const place = opts.kind === 'staff' ? 'AVN Workspace' : brand + ' customer portal';
-  const until = new Date(opts.expiresAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-  const lead = opts.purpose === 'welcome' ? 'Your ' + place + ' account is ready.' : 'Here is your link to sign in to ' + place + ' and set a new password.';
-  const subject = opts.purpose === 'welcome' ? 'Welcome to ' + place : 'Your ' + place + ' sign-in link';
-  const text = ['Hello ' + oneLine(opts.name) + ',', '', lead, '', 'Tap to sign in: ' + opts.url, '',
-    'The link works once, until ' + until + '. You will choose your own password after tapping it.',
-    'If you did not ask for this, ignore this email — nothing changes.'].join('\n');
-  const html = `<div style="font-family:Arial,sans-serif;font-size:15px;color:#111847;max-width:520px">
-<p style="margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#A84F00;font-weight:bold">${esc(place)}</p>
-<h2 style="margin:0 0 12px;font-size:20px">Hello ${esc(opts.name)},</h2>
-<p style="margin:0 0 20px">${esc(lead)}</p>
-<p style="margin:0 0 20px"><a href="${esc(opts.url)}" style="display:inline-block;background:#111847;color:#fff;padding:14px 22px;border-radius:10px;text-decoration:none;font-weight:bold">Sign in</a></p>
-<p style="margin:0 0 8px;color:#5B6285;font-size:13px">The button works once, until ${esc(until)}. You will choose your own password after tapping it.</p>
-<p style="margin:0;color:#5B6285;font-size:13px">If you did not ask for this, ignore this email — nothing changes.</p>
-</div>`;
-  try {
-    await send(s, { to: opts.to, subject, text, html });
-    return { sent: true };
-  } catch (e) {
-    console.error('Sign-in link email failed:', e.message);
-    return { error: e.message };
-  }
-}
-
-module.exports = { notifyLead, sendTest, sendLink, recipients, configured };
+module.exports = { notifyLead, sendTest, recipients, configured };

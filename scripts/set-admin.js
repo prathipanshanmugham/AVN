@@ -51,7 +51,7 @@ try {
 } catch (e) { /* no sessions table yet */ }
 
 console.log('\nAdmin sign-in updated');
-console.log('  Sign in at /admin/login with: ' + email + '  (or username "' + user.username + '")');
+console.log('  Sign in at /admin/login with username "' + user.username + '" (or ' + email + ')');
 console.log(made ? '  New password:  ' + password + '\n  (Shown only here — write it down. It works straight away; no forced change.)' : '  Password: the one you just typed');
 if (signedOut) console.log('  Signed out ' + signedOut + ' old session(s).');
 console.log('');

@@ -1,17 +1,13 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { db, MODULES, SETTING_DEFAULTS, QUOTE_COMPONENTS, getSettings, setSetting, getPermissions } = require('../db');
-const { ensureCsrf, csrfGuard, currentUser, can, requireStaff, allowMustChange, requireAdmin, signIn } = require('../auth');
-const { h, str, optStr, bool, email, url, bad, notFound, HttpError, generatePassword, hashPassword, checkPassword, baseUrl, EMAIL_RE } = require('../util');
+const { ensureCsrf, csrfGuard, currentUser, can, requireStaff, allowMustChange, requireAdmin, signIn, signOutEverywhere } = require('../auth');
+const { h, str, optStr, bool, email, url, bad, notFound, HttpError, generatePassword, hashPassword, checkPassword, EMAIL_RE } = require('../util');
 const QuoteCalc = require('../../admin/assets/quote-calc');
-const { sendTest, sendLink, configured: mailReady } = require('../mailer');
-const links = require('../links');
-const crypto = require('crypto');
+const { sendTest } = require('../mailer');
 
-const KEEP_SIGNED_IN = 30 * 86400000;
-/** May set a new password without retyping the current one: first sign-in (just typed it) or arrived by sign-in link. */
-const freshStart = (req, u) => !!u.must_change && (req.session.viaLink || (req.session.pwAt && Date.now() - req.session.pwAt < 30 * 60000));
-const unusablePassword = () => hashPassword(crypto.randomBytes(32).toString('hex'));
+/** Right after signing in with a temporary password, the new one can be set without typing the temporary one again. */
+const freshStart = (req, u) => !!u.must_change && !!req.session.pwAt && Date.now() - req.session.pwAt < 30 * 60000;
 
 const router = express.Router();
 
@@ -20,10 +16,8 @@ const loginLimiter = rateLimit({
   limit: 10,
   standardHeaders: 'draft-7',
   legacyHeaders: false,
-  message: { error: 'Too many sign-in attempts. Wait 15 minutes, or use “Forgot password?” to get a sign-in link.' },
+  message: { error: 'Too many sign-in attempts. Wait 15 minutes and try again.' },
 });
-const linkLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many tries. Wait 15 minutes.' } });
-const forgotLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: 'draft-7', legacyHeaders: false, message: { error: 'Too many requests. Wait 15 minutes.' } });
 
 const userOut = (u) => ({
   id: u.id, name: u.name, username: u.username, email: u.email || '', role: u.role,
@@ -43,44 +37,12 @@ router.post('/auth/login', loginLimiter, h(async (req, res) => {
   const password = String(req.body.password || '');
   const u = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE OR (email IS NOT NULL AND email = ? COLLATE NOCASE) ORDER BY active DESC LIMIT 1').get(username, username);
   if (!u || !checkPassword(password, u.password_hash)) {
-    throw new HttpError(401, 'That email / username and password don’t match. Check for typos, or tap “Forgot password?”.');
+    throw new HttpError(401, 'That username and password don’t match. Check for typos — or ask an admin to reset your password.');
   }
   if (!u.active) throw new HttpError(403, 'This account is switched off. Ask an admin to turn it back on.');
-  await signIn(req, { userId: u.id, pwAt: Date.now() }, { maxAge: bool(req.body.remember) ? KEEP_SIGNED_IN : 0 });
+  await signIn(req, { userId: u.id, pwAt: Date.now() });
   db.prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(u.id);
   res.json({ user: userOut(u), csrf: req.session.csrf });
-}));
-
-// "Forgot password?" — emails a 30-minute sign-in link. Same answer whether or not the email has an account.
-router.post('/auth/forgot', forgotLimiter, (req, res) => {
-  const s = getSettings();
-  const ready = mailReady(s);
-  const address = String(req.body.email || '').trim().toLowerCase();
-  if (ready && EMAIL_RE.test(address)) {
-    const u = db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE AND active = 1').get(address);
-    if (u) {
-      const l = links.create('staff', u.id, 'forgot');
-      const base = baseUrl(req);
-      setImmediate(() => sendLink({ to: u.email, name: u.name, url: base + l.path, kind: 'staff', purpose: 'forgot', expiresAt: l.expiresAt }).catch(() => {}));
-    }
-  }
-  res.json({ ok: true, email: ready });
-});
-
-// Sign-in link: GET shows who it is for (does not use it); POST uses it, signs in, and asks for a new password.
-router.get('/auth/link/:token', linkLimiter, (req, res) => {
-  const p = links.peek('staff', req.params.token);
-  const u = p.row && db.prepare('SELECT name, active FROM users WHERE id = ?').get(p.row.subject_id);
-  if (p.error || !u || !u.active) return res.status(410).json({ error: links.MESSAGES[p.error] || 'This account is switched off.' });
-  res.json({ name: u.name, purpose: p.row.purpose });
-});
-router.post('/auth/link', linkLimiter, h(async (req, res) => {
-  const p = links.consume('staff', req.body.token);
-  const u = p.row && db.prepare('SELECT * FROM users WHERE id = ?').get(p.row.subject_id);
-  if (p.error || !u || !u.active) throw new HttpError(410, links.MESSAGES[p.error] || 'This account is switched off.');
-  db.prepare("UPDATE users SET must_change = 1, last_login = datetime('now') WHERE id = ?").run(u.id);
-  await signIn(req, { userId: u.id, viaLink: true }, { maxAge: bool(req.body.remember) ? KEEP_SIGNED_IN : 0 });
-  res.json({ ok: true, csrf: req.session.csrf });
 }));
 
 router.post('/auth/logout', (req, res) => {
@@ -100,19 +62,13 @@ router.post('/auth/password', allowMustChange, requireStaff, (req, res) => {
   const full = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
   const fresh = freshStart(req, req.user);
   const current = String(req.body.current || '');
-  if (!fresh && !checkPassword(current, full.password_hash)) throw bad('Your current password is not right. Forgot it? Sign out and tap “Forgot password?”.');
+  if (!fresh && !checkPassword(current, full.password_hash)) throw bad('Your current password is not right. Forgot it? Ask an admin to reset it.');
   const next = String(req.body.next || '');
   if (next.length < 8) throw bad('The new password needs at least 8 characters');
   if (next.length > 200) throw bad('The new password is too long');
   if (checkPassword(next, full.password_hash)) throw bad('Choose a new password that is different from the current one');
   db.prepare('UPDATE users SET password_hash = ?, must_change = 0 WHERE id = ?').run(hashPassword(next), req.user.id);
-  // Other devices signed in with the old password are signed out.
-  try {
-    db.prepare('SELECT sid, data FROM sessions').all().forEach((r) => {
-      try { if (r.sid !== req.sessionID && JSON.parse(r.data).userId === req.user.id) db.prepare('DELETE FROM sessions WHERE sid = ?').run(r.sid); } catch (e) { /* skip */ }
-    });
-  } catch (e) { /* ignore */ }
-  delete req.session.viaLink;
+  signOutEverywhere('userId', req.user.id, req.sessionID); // other devices signed in with the old password
   delete req.session.pwAt;
   res.json({ ok: true });
 });
@@ -140,31 +96,14 @@ router.post('/users', requireAdmin, (req, res) => {
   if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) throw bad('That username is taken');
   if (email && !EMAIL_RE.test(email)) throw bad('Check the email address');
   if (email && db.prepare('SELECT 1 FROM users WHERE email = ? COLLATE NOCASE').get(email)) throw bad('Another user already has that email');
-  // With a password typed by the admin: they sign in with it and choose their own. Without: a sign-in link.
+  // A first password (typed by the admin, or made for them). Shown once; they choose their own after signing in.
   const provided = String(req.body.password || '');
   if (provided && provided.length < 8) throw bad('Password must be at least 8 characters');
+  const temp = provided || generatePassword();
   const info = db.prepare('INSERT INTO users (name, username, email, password_hash, role, must_change) VALUES (?,?,?,?,?,1)')
-    .run(name, username, email, provided ? hashPassword(provided) : unusablePassword(), role);
+    .run(name, username, email, hashPassword(temp), role);
   const u = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
-  if (provided) return res.status(201).json({ user: userOut(u), tempPassword: provided });
-  res.status(201).json({ user: userOut(u), link: makeStaffLink(req, u, 'welcome', bool(req.body.sendEmail)) });
-});
-
-function makeStaffLink(req, u, purpose, email) {
-  const l = links.create('staff', u.id, purpose, req.user.id);
-  const url = baseUrl(req) + l.path;
-  const willEmail = !!(email && u.email && mailReady(getSettings()));
-  if (willEmail) setImmediate(() => sendLink({ to: u.email, name: u.name, url, kind: 'staff', purpose, expiresAt: l.expiresAt }).catch(() => {}));
-  return { url, expiresAt: l.expiresAt, purpose, emailed: willEmail };
-}
-
-// A fresh one-time sign-in link for someone who is new or has forgotten their password.
-router.post('/users/:id/link', requireAdmin, (req, res) => {
-  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
-  if (!u) throw notFound();
-  if (u.id === req.user.id) throw bad('To change your own password, use My account → Change password');
-  if (!u.active) throw bad('Turn this account on first (Edit → Status: Active)');
-  res.json(makeStaffLink(req, u, u.last_login ? 'reset' : 'welcome', bool(req.body.sendEmail)));
+  res.status(201).json({ user: userOut(u), tempPassword: temp });
 });
 
 function activeAdmins(exceptId) {
@@ -194,6 +133,7 @@ router.post('/users/:id/reset-password', requireAdmin, (req, res) => {
   if (u.id === req.user.id) throw bad('To change your own password, use My account → Change password');
   const temp = generatePassword();
   db.prepare('UPDATE users SET password_hash = ?, must_change = 1 WHERE id = ?').run(hashPassword(temp), u.id);
+  signOutEverywhere('userId', u.id);
   res.json({ tempPassword: temp });
 });
 
