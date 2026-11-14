@@ -112,7 +112,9 @@ async function main() {
     r = await admin.req('GET', '/api/leads');
     ok(r.status === 403 && r.data.mustChange, 'blocked until password changed');
     r = await admin.req('POST', '/api/auth/password', { current: ADMIN_PW, next: 'short' });
-    ok(r.status === 400, 'short password rejected');
+    ok(r.status === 400 && /8 characters/.test(r.data.error), 'short password rejected with a clear message');
+    r = await admin.req('POST', '/api/auth/password', { current: 'not-it', next: 'Whatever-2026' });
+    ok(r.status === 400 && /current password is not right/.test(r.data.error), 'wrong current password explained');
     r = await admin.req('POST', '/api/auth/password', { current: ADMIN_PW, next: 'Admin-New-Pass-2026' });
     ok(r.status === 200, 'admin password changed');
     r = await admin.req('GET', '/api/leads');
@@ -481,6 +483,18 @@ async function main() {
     await shell.csrfToken();
     r = await shell.req('POST', '/api/auth/login', { username: 'ADMIN@avnsolar.in', password: 'Shell-Set-Pass-9' });
     ok(r.status === 200 && r.data.user.role === 'admin' && r.data.user.mustChange === false, 'admin signs in with the email set by admin:set');
+    const printed = execFileSync(process.execPath, ['scripts/set-admin.js', 'admin@avnsolar.in'], { cwd: path.join(__dirname, '..'), env }).toString();
+    const madePw = (printed.match(/New password:\s+(\S+)/) || [])[1];
+    r = await shell.req('GET', '/api/auth/me');
+    ok(r.status === 401 && /Signed out \d+ old session/.test(printed), 'a server reset signs the admin out everywhere');
+    const fresh = new Client();
+    await fresh.csrfToken();
+    r = await fresh.req('POST', '/api/auth/login', { username: 'admin@avnsolar.in', password: madePw });
+    const other = new Client();
+    await other.csrfToken();
+    const oldPw = await other.req('POST', '/api/auth/login', { username: 'admin@avnsolar.in', password: 'Shell-Set-Pass-9' });
+    ok(madePw && madePw.length >= 16 && r.status === 200 && oldPw.status === 401,
+      'admin:set with no password makes a strong one that works (old one no longer does)');
 
     console.log('Calendar');
     r = await staff.req('POST', '/api/events', { title: 'Site visit', type: 'visit', date: '2026-11-10', time: '11:00' });

@@ -411,3 +411,10 @@ body{-webkit-tap-highlight-color:rgba(17,24,71,.08)}
 .prose-admin table{border-collapse:collapse;width:100%}
 .prose-admin th,.prose-admin td{border:1px solid var(--line);padding:6px 10px;text-align:left}
 @media (max-width:900px){.mdbar{top:var(--mtop,60px)}}
+
+/* Password fields */
+.pwbox{position:relative;display:block}
+.pwbox .input{width:100%;padding-right:72px}
+.pweye{position:absolute;top:50%;right:6px;transform:translateY(-50%);min-height:36px;min-width:56px;padding:0 10px;border:0;border-radius:10px;background:var(--ground);color:var(--ink);font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.pwrules{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--muted)}
+.pwrules li.pass{color:#0a7a3e;font-weight:600}

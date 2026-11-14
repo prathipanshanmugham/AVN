@@ -133,7 +133,7 @@ portal.post('/password', allowMustChange, requireClient, (req, res) => {
   const full = db.prepare('SELECT password_hash FROM clients WHERE id = ?').get(req.client.id);
   if (!checkPassword(req.body.current, full.password_hash)) throw bad('Your current password is not right');
   const next = String(req.body.next || '');
-  if (next.length < 8) throw bad('Use at least 8 characters');
+  if (next.length < 8) throw bad('The new password needs at least 8 characters');
   if (next === String(req.body.current)) throw bad('Choose a password different from the current one');
   db.prepare('UPDATE clients SET password_hash = ?, must_change = 0 WHERE id = ?').run(hashPassword(next), req.client.id);
   res.json({ ok: true });

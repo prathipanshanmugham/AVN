@@ -1,19 +1,22 @@
 #!/usr/bin/env node
-/* Set the admin's sign-in email and password exactly, from the server shell.
- *   npm run admin:set -- admin@avnsolar.in 'Your-Password'
+/* Set the admin's sign-in email and password, from the server shell.
+ *   npm run admin:set -- admin@avnsolar.in                  (makes a new strong password and shows it here)
+ *   npm run admin:set -- admin@avnsolar.in 'Your-Password'  (sets exactly this password)
  *   npm run admin:set -- admin@avnsolar.in 'Your-Password' meera   (another username)
  * The admin can then sign in at /admin with that email (or the username). No forced password change.
  * The password is only hashed into the database. Keep it out of git and chat logs.
  */
 const { db } = require('../server/db');
-const { hashPassword, EMAIL_RE } = require('../server/util');
+const { hashPassword, generatePassword, EMAIL_RE } = require('../server/util');
 
-const [emailArg, password, usernameArg] = process.argv.slice(2);
+const [emailArg, typed, usernameArg] = process.argv.slice(2);
 const email = String(emailArg || '').trim().toLowerCase();
 const username = String(usernameArg || 'admin').trim().toLowerCase();
+const made = !typed;
+const password = typed || generatePassword(4, 4);
 
-if (!EMAIL_RE.test(email) || !password) {
-  console.error("Usage: npm run admin:set -- admin@avnsolar.in 'Your-Password' [username]");
+if (!EMAIL_RE.test(email)) {
+  console.error("Usage: npm run admin:set -- admin@avnsolar.in ['Your-Password'] [username]");
   process.exit(1);
 }
 if (password.length < 8) {
@@ -40,6 +43,15 @@ db.transaction(() => {
   }
 })();
 
+// Signs this admin out everywhere, so only the new password works from now on.
+let signedOut = 0;
+try {
+  const rows = db.prepare('SELECT sid, data FROM sessions').all();
+  rows.forEach((r) => { try { if (JSON.parse(r.data).userId === user.id) { db.prepare('DELETE FROM sessions WHERE sid = ?').run(r.sid); signedOut++; } } catch (e) { /* skip */ } });
+} catch (e) { /* no sessions table yet */ }
+
 console.log('\nAdmin sign-in updated');
 console.log('  Sign in at /admin/login with: ' + email + '  (or username "' + user.username + '")');
-console.log('  Password: the one you just typed\n');
+console.log(made ? '  New password:  ' + password + '\n  (Shown only here — write it down. It works straight away; no forced change.)' : '  Password: the one you just typed');
+if (signedOut) console.log('  Signed out ' + signedOut + ' old session(s).');
+console.log('');

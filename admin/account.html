@@ -27,11 +27,20 @@
     </template>
     <h2 class="h2">Change password</h2>
     <div class="error" x-show="error" x-text="error" role="alert"></div>
-    <form class="stack" @submit.prevent="save">
-      <label class="field">Current password<input class="input" type="password" x-model="current" autocomplete="current-password" required></label>
-      <label class="field">New password <small>At least 10 characters</small><input class="input" type="password" x-model="next" autocomplete="new-password" minlength="10" required></label>
-      <label class="field">Repeat new password<input class="input" type="password" x-model="repeat" autocomplete="new-password" required></label>
-      <button class="btn dark" type="submit" :disabled="busy">Save new password</button>
+    <form class="stack" @submit.prevent="save" novalidate>
+      <input type="text" autocomplete="username" :value="$store.app.user.email || $store.app.user.username" hidden aria-hidden="true">
+      <label class="field">Current password
+        <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="current" autocomplete="current-password" @input="error = ''"><button type="button" class="pweye" @click="show = !show" :aria-label="show ? 'Hide passwords' : 'Show passwords'" x-text="show ? 'Hide' : 'Show'"></button></span></label>
+      <label class="field">New password <small>at least 8 characters</small>
+        <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="next" autocomplete="new-password" @input="error = ''"></span></label>
+      <label class="field">Repeat new password
+        <span class="pwbox"><input class="input" :type="show ? 'text' : 'password'" x-model="repeat" autocomplete="new-password" @input="error = ''"></span></label>
+      <ul class="pwrules" aria-live="polite">
+        <li :class="next.length >= 8 && 'pass'" x-text="(next.length >= 8 ? '✓ ' : '• ') + 'At least 8 characters' + (next && next.length < 8 ? ' (' + next.length + ' so far)' : '')"></li>
+        <li :class="repeat && next === repeat && 'pass'" x-text="(repeat && next === repeat ? '✓ ' : '• ') + 'Both new passwords match'"></li>
+        <li :class="next && next !== current && 'pass'" x-text="(next && next !== current ? '✓ ' : '• ') + 'Different from the current password'"></li>
+      </ul>
+      <button class="btn dark" type="submit" :disabled="busy" x-text="busy ? 'Saving…' : 'Save new password'">Save new password</button>
     </form>
   </div>
 </main>

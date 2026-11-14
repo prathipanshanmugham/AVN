@@ -24,7 +24,7 @@
 
     Alpine.data('portal', () => ({
       me: null, error: '', sent: false,
-      pw: { current: '', next: '', repeat: '' },
+      pw: { current: '', next: '', repeat: '' }, pwShow: false,
       req: { projectId: '', message: '' },
       async init() { await this.load(); },
       async load() {
@@ -34,7 +34,9 @@
       },
       async changePassword() {
         this.error = '';
-        if (this.pw.next !== this.pw.repeat) { this.error = 'The new passwords do not match'; return; }
+        if (!this.pw.current) { this.error = 'Enter the temporary password you signed in with'; return; }
+        if (this.pw.next.length < 8) { this.error = 'The new password needs at least 8 characters'; return; }
+        if (this.pw.next !== this.pw.repeat) { this.error = 'The two new passwords do not match'; return; }
         try { await api('POST', '/password', { current: this.pw.current, next: this.pw.next }); await this.load(); } catch (e) { this.error = e.message; }
       },
       async sendRequest() {

@@ -55,10 +55,11 @@ router.get('/auth/me', allowMustChange, requireStaff, (req, res) => {
 
 router.post('/auth/password', allowMustChange, requireStaff, (req, res) => {
   const full = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
-  if (!checkPassword(req.body.current, full.password_hash)) throw bad('Your current password is not right');
+  if (!checkPassword(String(req.body.current || ''), full.password_hash)) throw bad('Your current password is not right. If you have forgotten it, an admin can reset it.');
   const next = String(req.body.next || '');
-  if (next.length < 10) throw bad('Use at least 10 characters');
-  if (next === String(req.body.current)) throw bad('Choose a password different from the current one');
+  if (next.length < 8) throw bad('The new password needs at least 8 characters');
+  if (next.length > 200) throw bad('The new password is too long');
+  if (next === String(req.body.current)) throw bad('Choose a new password that is different from the current one');
   db.prepare('UPDATE users SET password_hash = ?, must_change = 0 WHERE id = ?').run(hashPassword(next), req.user.id);
   res.json({ ok: true });
 });
@@ -85,7 +86,7 @@ router.post('/users', requireAdmin, (req, res) => {
   if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw bad('Username: 3–40 letters, numbers, dot, dash or underscore');
   if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) throw bad('That username is taken');
   const provided = String(req.body.password || '');
-  if (provided && provided.length < 10) throw bad('Password must be at least 10 characters');
+  if (provided && provided.length < 8) throw bad('Password must be at least 8 characters');
   const temp = provided || generatePassword();
   const info = db.prepare('INSERT INTO users (name, username, email, password_hash, role, must_change) VALUES (?,?,?,?,?,1)')
     .run(name, username, email, hashPassword(temp), role);
